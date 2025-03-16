@@ -1,0 +1,72 @@
+/* アプリケーション全体のスタイル */
+:root {
+  --primary-color: #4a7aff;
+  --secondary-color: #3c6ce7;
+  --success-color: #50cd89;
+  --warning-color: #ffc700;
+  --danger-color: #f1416c;
+  --light-gray: #f8f9fa;
+  --gray: #e9ecef;
+  --dark-gray: #495057;
+  --dark: #212529;
+}
+
+/* ベーススタイル */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ユーティリティクラス */
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 1rem;
+}
+
+/* ダークモード用のスタイル調整 */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --light-gray: #343a40;
+    --gray: #495057;
+    --dark-gray: #adb5bd;
+  }
+}
+
+/* スクロールバーのスタイル調整 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--light-gray);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--dark-gray);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--dark);
+}
+
+/* アニメーション */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+} 
