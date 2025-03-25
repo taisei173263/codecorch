@@ -30,8 +30,21 @@ const RepositoryList: React.FC<RepositoryListProps> = ({
       const repos = await getUserRepositories();
       setRepositories(repos);
     } catch (err) {
-      setError('リポジトリの取得に失敗しました。GitHubとの接続を確認してください。');
-      console.error(err);
+      console.error('Repository fetch error:', err);
+      
+      // エラーメッセージの種類によって適切なフィードバックを表示
+      if (err instanceof Error) {
+        if (err.message.includes('GitHub access token not found') || 
+            err.message.includes('authentication expired')) {
+          setError('GitHubの認証に問題があります。再度ログインしてください。');
+        } else if (err.message.includes('rate limit exceeded')) {
+          setError('GitHub APIのレート制限に達しました。しばらく待ってから再試行してください。');
+        } else {
+          setError('リポジトリの取得に失敗しました: ' + err.message);
+        }
+      } else {
+        setError('リポジトリの取得に失敗しました。GitHubとの接続を確認してください。');
+      }
     } finally {
       setLoading(false);
     }
@@ -105,7 +118,13 @@ const RepositoryList: React.FC<RepositoryListProps> = ({
       {/* エラーメッセージ */}
       {error && (
         <div className="bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 p-3 rounded-md mb-4 text-sm">
-          {error}
+          <p>{error}</p>
+          <button 
+            onClick={fetchRepositories}
+            className="mt-2 px-3 py-1 bg-red-100 dark:bg-red-800 text-red-800 dark:text-red-200 rounded-md hover:bg-red-200 dark:hover:bg-red-700 text-xs font-medium"
+          >
+            再試行
+          </button>
         </div>
       )}
 

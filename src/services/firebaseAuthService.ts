@@ -1,5 +1,5 @@
 import firebase from 'firebase/app';
-import { auth } from '../firebase/firebase';
+import { auth } from '../firebase/services';
 
 // GitHub認証
 export const signInWithGithub = async () => {

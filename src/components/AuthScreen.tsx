@@ -13,15 +13,25 @@ import {
   signInWithGoogle, 
   loginWithEmail, 
   registerWithEmail 
-} from '../firebase/firebase';
+} from '../firebase/services';
 
 type AuthMode = 'login' | 'register';
 
 interface AuthScreenProps {
-  onLogin: (method: string, email?: string, password?: string) => void;
+  onGithubLogin: () => Promise<{ success: boolean; error?: any; user?: any }>;
+  onGoogleLogin: () => Promise<{ success: boolean; error?: any; user?: any }>;
+  onEmailLogin: (email: string, password: string) => Promise<{ success: boolean; error?: any; user?: any }>;
+  isDarkMode: boolean;
+  toggleDarkMode: () => void;
 }
 
-const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
+const AuthScreen: React.FC<AuthScreenProps> = ({ 
+  onGithubLogin, 
+  onGoogleLogin, 
+  onEmailLogin,
+  isDarkMode, 
+  toggleDarkMode 
+}) => {
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -34,11 +44,29 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
     setError(null);
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      onLogin('github');
+      console.log('GitHub認証を開始します...');
+      
+      // ポップアップウィンドウのCross-Origin問題を回避するためにリダイレクト認証に切り替え
+      // または既存のポップアップ認証の方法を維持しつつエラーハンドリングを改善
+      const result = await onGithubLogin();
+      console.log('GitHub認証結果:', result);
+      
+      if (!result.success) {
+        const errorMessage = result.error instanceof Error 
+          ? result.error.message 
+          : (result.error && typeof result.error === 'object' && 'code' in result.error)
+            ? `GitHub認証エラー: ${(result.error as any).code}`
+            : 'GitHub認証に失敗しました。もう一度お試しください。';
+        setError(errorMessage);
+        return;
+      }
     } catch (error) {
-      setError('GitHub認証に失敗しました。もう一度お試しください。');
       console.error('GitHub login error:', error);
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('GitHub認証に失敗しました。もう一度お試しください。');
+      }
     } finally {
       setLoading(false);
     }
@@ -49,11 +77,29 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
     setError(null);
     
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      onLogin('google');
+      console.log('Google認証を開始します...');
+      
+      // ポップアップウィンドウのCross-Origin問題を回避するためにリダイレクト認証に切り替え
+      // または既存のポップアップ認証の方法を維持しつつエラーハンドリングを改善
+      const result = await onGoogleLogin();
+      console.log('Google認証結果:', result);
+      
+      if (!result.success) {
+        const errorMessage = result.error instanceof Error 
+          ? result.error.message 
+          : (result.error && typeof result.error === 'object' && 'code' in result.error)
+            ? `Google認証エラー: ${(result.error as any).code}`
+            : 'Google認証に失敗しました。もう一度お試しください。';
+        setError(errorMessage);
+        return;
+      }
     } catch (error) {
-      setError('Google認証に失敗しました。もう一度お試しください。');
       console.error('Google login error:', error);
+      if (error instanceof Error) {
+        setError(error.message);
+      } else {
+        setError('Google認証に失敗しました。もう一度お試しください。');
+      }
     } finally {
       setLoading(false);
     }
@@ -73,21 +119,18 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ onLogin }) => {
         throw new Error('名前は必須です。');
       }
       
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
       if (mode === 'login') {
-        const result = await loginWithEmail(email, password);
+        const result = await onEmailLogin(email, password);
         if (!result.success) {
           setError('ログインに失敗しました。メールアドレスとパスワードを確認してください。');
         }
       } else {
+        // 登録処理は直接呼び出し
         const result = await registerWithEmail(email, password);
         if (!result.success) {
           setError('登録に失敗しました。別のメールアドレスを試すか、強いパスワードを設定してください。');
         }
       }
-      
-      onLogin('email', email, password);
     } catch (error) {
       if (error instanceof Error) {
         setError(error.message);

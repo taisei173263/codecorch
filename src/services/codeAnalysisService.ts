@@ -85,6 +85,8 @@ const loadModel = async () => {
   if (model) return model;
 
   try {
+    console.log('コード分析モデルを初期化中...');
+    
     // シンプルなコード品質評価用のモデルを作成
     const sequential = tf.sequential();
     
@@ -113,11 +115,12 @@ const loadModel = async () => {
     // モデルの重みは本来は訓練データに基づいて学習されるべきですが、
     // この例では簡単のため、ランダムな初期値のままとします
     
-    console.log('モデルがロードされました');
+    console.log('コード分析モデルが正常に初期化されました');
     model = sequential;
     return model;
   } catch (error) {
-    console.error('モデルのロードに失敗:', error);
+    console.error('コード分析モデルのロードに失敗:', error);
+    // エラーが発生してもアプリケーションは継続できるようにする
     return null;
   }
 };

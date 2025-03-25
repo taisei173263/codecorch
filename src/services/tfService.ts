@@ -10,6 +10,7 @@ import { Skill } from './learningPathService';
 // モデルの初期化状態
 let modelInitialized = false;
 let codePatternModel: tf.Sequential | null = null;
+let modelLoadAttempted = false;
 
 /**
  * TensorFlowモデルの初期化
@@ -17,7 +18,17 @@ let codePatternModel: tf.Sequential | null = null;
  */
 export const initTensorFlowModel = async (): Promise<boolean> => {
   try {
-    if (modelInitialized) return true;
+    // 既にモデルが初期化されている場合は処理をスキップ
+    if (modelInitialized && codePatternModel) return true;
+    
+    // 初期化を一度だけ試行するフラグをセット
+    if (modelLoadAttempted) {
+      console.warn('TensorFlowモデルの初期化は既に試行されました。');
+      return false;
+    }
+    
+    modelLoadAttempted = true;
+    console.log('TensorFlow.jsモデルを初期化中...');
     
     // シンプルな言語パターン認識のための軽量モデル
     // tf.sequentialを使用して正しく初期化
@@ -49,12 +60,20 @@ export const initTensorFlowModel = async (): Promise<boolean> => {
       metrics: ['accuracy']
     });
     
-    modelInitialized = true;
-    console.log('TensorFlow.jsモデルが初期化されました');
+    // モデルの状態を確認
+    if (codePatternModel) {
+      modelInitialized = true;
+      console.log('TensorFlow.jsモデルが正常に初期化されました');
+    } else {
+      throw new Error('モデルオブジェクトが正しく作成されませんでした');
+    }
     
     return true;
   } catch (error) {
     console.error('TensorFlowモデル初期化エラー:', error);
+    // エラーが発生しても最小限の機能で続行できるようにする
+    modelInitialized = false;
+    codePatternModel = null;
     return false;
   }
 };

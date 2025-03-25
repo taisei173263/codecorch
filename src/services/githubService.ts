@@ -46,7 +46,12 @@ export interface CodeFile {
 // GitHubのアクセストークンを取得
 const getGithubToken = (): string | null => {
   // ローカルストレージからGitHubトークンを取得
-  return localStorage.getItem('github_token');
+  const token = localStorage.getItem('github_token');
+  
+  // デバッグ用にトークンの有無をログ出力（実際のトークンは出力しない）
+  console.log('GitHub token available:', !!token);
+  
+  return token;
 };
 
 // GitHub APIを呼び出す共通関数
@@ -54,7 +59,8 @@ const fetchFromGithub = async (endpoint: string, options?: RequestInit) => {
   const token = getGithubToken();
   
   if (!token) {
-    throw new Error('GitHub access token not found. Please login with GitHub.');
+    console.error('GitHub access token is missing. Please login with GitHub again.');
+    throw new Error('GitHub access token not found. Please login with GitHub again.');
   }
 
   const url = `${GITHUB_API_BASE_URL}${endpoint}`;
@@ -65,14 +71,34 @@ const fetchFromGithub = async (endpoint: string, options?: RequestInit) => {
     },
   };
 
-  const response = await fetch(url, { ...defaultOptions, ...options });
-  
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(`GitHub API error: ${response.status} - ${error}`);
+  try {
+    const response = await fetch(url, { ...defaultOptions, ...options });
+    
+    if (response.status === 401) {
+      // 認証エラー - トークンが無効または期限切れ
+      console.error('GitHub token is invalid or expired. Clearing from storage.');
+      localStorage.removeItem('github_token');
+      throw new Error('GitHub authentication expired. Please login again.');
+    }
+    
+    if (response.status === 403 && response.headers.get('X-RateLimit-Remaining') === '0') {
+      // レート制限に達した
+      const resetTime = response.headers.get('X-RateLimit-Reset');
+      const resetDate = resetTime ? new Date(parseInt(resetTime) * 1000).toLocaleTimeString() : 'unknown time';
+      throw new Error(`GitHub API rate limit exceeded. Resets at ${resetDate}`);
+    }
+    
+    if (!response.ok) {
+      const error = await response.text();
+      console.error(`GitHub API error: ${response.status}`, error);
+      throw new Error(`GitHub API error: ${response.status} - ${error}`);
+    }
+    
+    return response.json();
+  } catch (error) {
+    console.error('GitHub API request failed:', error);
+    throw error;
   }
-  
-  return response.json();
 };
 
 /**

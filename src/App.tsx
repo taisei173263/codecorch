@@ -2,8 +2,16 @@ import { useEffect, useState } from 'react';
 import './App.css';
 import AuthScreen from './components/AuthScreen';
 import Dashboard from './components/Dashboard';
+import TwoFactorAuth from './components/TwoFactorAuth';
 import firebase from 'firebase/app';
-import { auth } from './firebase/firebase';
+import { 
+  auth, 
+  signInWithGithub, 
+  signInWithGoogle, 
+  loginWithEmail,
+  subscribeToAuthChanges,
+  handleRedirectResult
+} from './firebase/services';
 
 // ダークモードの状態定義
 export interface ThemeContextType {
@@ -16,6 +24,9 @@ function App() {
   // ユーザー認証状態
   const [user, setUser] = useState<firebase.User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showTwoFactorSetup, setShowTwoFactorSetup] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [showBanner, setShowBanner] = useState(true);
   
   // ダークモード状態
   const [isDarkMode, setIsDarkMode] = useState(() => {
@@ -26,6 +37,42 @@ function App() {
     }
     return window.matchMedia('(prefers-color-scheme: dark)').matches;
   });
+
+  // リダイレクト認証結果の処理
+  useEffect(() => {
+    const processRedirectResult = async () => {
+      try {
+        // リダイレクト認証からの結果を確認
+        const result = await handleRedirectResult();
+        console.log('Redirect authentication result:', result.success);
+        
+        // エラーがあればセット
+        if (!result.success && result.error && result.error !== 'No authentication result') {
+          setError(`認証に失敗しました: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('リダイレクト結果の処理中にエラー:', error);
+      }
+    };
+    
+    processRedirectResult();
+  }, []);
+
+  // 認証状態の監視
+  useEffect(() => {
+    try {
+      const unsubscribe = subscribeToAuthChanges((user) => {
+        setUser(user);
+        setLoading(false);
+      });
+
+      return () => unsubscribe();
+    } catch (error) {
+      console.error('認証状態の監視エラー:', error);
+      setError('認証の初期化に失敗しました。ページを更新してください。');
+      setLoading(false);
+    }
+  }, []);
 
   // ダークモード切り替え関数
   const toggleDarkMode = () => {
@@ -41,7 +88,7 @@ function App() {
     }
   };
 
-  // 初期化時にローカルストレージからユーザー情報を取得
+  // 初期化時にダークモード設定を適用
   useEffect(() => {
     // ダークモードの初期設定
     if (isDarkMode) {
@@ -50,44 +97,48 @@ function App() {
       document.documentElement.classList.remove('dark');
     }
     
-    // Firebase認証状態の監視を設定
-    const unsubscribe = auth.onAuthStateChanged((authUser) => {
-      setUser(authUser);
-      setLoading(false);
-    });
+    // OS のカラースキーム変更を監視
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      // ユーザーが明示的に設定していない場合のみ OS の設定に従う
+      if (localStorage.getItem('darkMode') === null) {
+        setIsDarkMode(e.matches);
+        if (e.matches) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      }
+    };
     
-    // コンポーネントのアンマウント時に監視を解除
-    return () => unsubscribe();
-  }, [isDarkMode]);
-
-  // ログイン処理
-  const handleLogin = async (result: any) => {
-    try {
-      // Firebase認証結果からユーザー情報を抽出
-      let user = result.user || result;
-      
-      // ユーザー情報をローカルストレージに保存（オプション）
-      localStorage.setItem('user', JSON.stringify({
-        uid: user.uid,
-        displayName: user.displayName,
-        email: user.email,
-        photoURL: user.photoURL
-      }));
-      
-      setUser(user);
-    } catch (error) {
-      console.error('ログイン処理エラー:', error);
-    }
-  };
+    // イベントリスナーを追加
+    mediaQuery.addEventListener('change', handleChange);
+    
+    // クリーンアップ関数
+    return () => {
+      mediaQuery.removeEventListener('change', handleChange);
+    };
+  }, []);
 
   // ログアウト処理
   const handleLogout = async () => {
     try {
-      localStorage.removeItem('user');
+      await auth.signOut();
       setUser(null);
     } catch (error) {
       console.error('ログアウトエラー:', error);
+      setError('ログアウトに失敗しました。');
     }
+  };
+
+  // 2FA設定の表示
+  const handleEnableTwoFactor = () => {
+    setShowTwoFactorSetup(true);
+  };
+
+  // 2FA設定の完了
+  const handleTwoFactorComplete = () => {
+    setShowTwoFactorSetup(false);
   };
 
   // ローディング中の表示
@@ -99,17 +150,54 @@ function App() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
+        <div className="text-red-500 dark:text-red-400">{error}</div>
+      </div>
+    );
+  }
+
+  if (showTwoFactorSetup && user) {
+    return (
+      <TwoFactorAuth
+        user={user}
+        onComplete={handleTwoFactorComplete}
+        onCancel={() => setShowTwoFactorSetup(false)}
+      />
+    );
+  }
+
   return (
     <div className={`min-h-screen transition-colors duration-200 ${isDarkMode ? 'dark bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
+      {showBanner && (
+        <div className="bg-blue-600 text-white p-3 text-center">
+          <p>サイトの全機能を利用するには、何らかのインタラクションが必要です</p>
+          <button 
+            onClick={() => setShowBanner(false)}
+            className="mt-2 bg-white text-blue-600 px-4 py-1 rounded hover:bg-gray-100"
+          >
+            了解
+          </button>
+        </div>
+      )}
+      
       {user ? (
         <Dashboard 
           user={user}
           onLogout={handleLogout}
           isDarkMode={isDarkMode}
           toggleDarkMode={toggleDarkMode}
+          onEnableTwoFactor={handleEnableTwoFactor}
         />
       ) : (
-        <AuthScreen onLogin={handleLogin} />
+        <AuthScreen
+          onGithubLogin={signInWithGithub}
+          onGoogleLogin={signInWithGoogle}
+          onEmailLogin={loginWithEmail}
+          isDarkMode={isDarkMode}
+          toggleDarkMode={toggleDarkMode}
+        />
       )}
     </div>
   );

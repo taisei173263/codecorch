@@ -11,7 +11,9 @@ import {
 
 interface SkillsAndLearningViewProps {
   recommendedSkills: Skill[];
-  userId: string;
+  repoName: string;
+  analysisResult: any;
+  userId?: string;
 }
 
 const SkillLevelBadge: React.FC<{ level: SkillLevel }> = ({ level }) => {
@@ -50,7 +52,9 @@ const SkillLevelBadge: React.FC<{ level: SkillLevel }> = ({ level }) => {
 
 const SkillsAndLearningView: React.FC<SkillsAndLearningViewProps> = ({
   recommendedSkills,
-  userId
+  repoName,
+  analysisResult,
+  userId = 'anonymous'
 }) => {
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(
     recommendedSkills.length > 0 ? recommendedSkills[0] : null

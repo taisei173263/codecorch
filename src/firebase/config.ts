@@ -1,19 +1,38 @@
-// Firebase設定
-// 本番環境では環境変数からロードすることを推奨
-
-/**
- * 環境変数またはデフォルト値から設定を取得
- * 本番環境では.envファイルまたは環境変数に設定してください
- */
-export const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "YOUR_API_KEY",
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || "codecoach-app.firebaseapp.com",
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || "codecoach-app",
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || "codecoach-app.appspot.com",
-  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID || "YOUR_MESSAGING_SENDER_ID",
-  appId: import.meta.env.VITE_FIREBASE_APP_ID || "YOUR_APP_ID",
-  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "YOUR_MEASUREMENT_ID"
+// Firebase設定 - ハードコードした値を使用
+const firebaseConfig = {
+  apiKey: "AIzaSyB-hTYnbPzKioEN02HBqGPnS04NqvJXryY",
+  authDomain: "codecoach-61d26.firebaseapp.com",
+  projectId: "codecoach-61d26",
+  storageBucket: "codecoach-61d26.appspot.com",
+  messagingSenderId: "313757336409",
+  appId: "1:313757336409:web:b73f3d69835f848975c248",
+  measurementId: "G-DCBS6YVDZK",
+  databaseURL: "https://codecoach-61d26-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
+
+export { firebaseConfig };
+
+// デバッグログ
+console.log('Config loaded with fixed values:', {
+  projectId: firebaseConfig.projectId,
+  hasApiKey: Boolean(firebaseConfig.apiKey),
+  hasAuthDomain: Boolean(firebaseConfig.authDomain),
+});
+
+// 設定が有効かチェック
+if (!firebaseConfig.apiKey) {
+  console.error(
+    'Firebase API key is not set. Please check your .env file and ensure VITE_FIREBASE_API_KEY is properly configured.'
+  );
+  console.log('Current environment variables:', {
+    apiKey: Boolean(firebaseConfig.apiKey),
+    authDomain: Boolean(firebaseConfig.authDomain),
+    projectId: Boolean(firebaseConfig.projectId),
+    databaseURL: Boolean(firebaseConfig.databaseURL),
+  });
+} else {
+  console.log('Firebase API キーが正しく読み込まれました');
+}
 
 // 本番環境用に.envファイルまたは環境変数を設定してください
 // 例: 

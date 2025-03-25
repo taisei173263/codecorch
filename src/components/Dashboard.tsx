@@ -3,10 +3,12 @@ import {
   Github, LogOut, Menu, X, Moon, Sun, 
   Code, BarChart3, BookOpen, FileCode, 
   AlertCircle, CheckCircle2, ChevronDown,
-  User as UserIcon
+  User as UserIcon, HelpCircle
 } from 'lucide-react';
 import RepositoryList from './RepositoryList';
 import CodeAnalysisView from './CodeAnalysisView';
+import SkillsAndLearningView from './SkillsAndLearningView';
+import HowToUseGuide from './HowToUseGuide';
 import { Skill } from '../services/learningPathService';
 import { getUserRepositories, Repository } from '../services/githubService';
 import { analyzeRepository, RepositoryAnalysisResult, FileAnalysisResult, CodeIssue } from '../services/codeAnalysisService';
@@ -18,6 +20,7 @@ export interface User {
   displayName: string | null;
   email: string | null;
   photoURL: string | null;
+  twoFactorEnabled?: boolean;
 }
 
 // DashboardProps インターフェースにダークモード関連のプロパティを追加
@@ -26,6 +29,7 @@ export interface DashboardProps {
   onLogout: () => Promise<void>;
   isDarkMode: boolean;
   toggleDarkMode: () => void;
+  onEnableTwoFactor: () => void;
 }
 
 /**
@@ -36,7 +40,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   user, 
   onLogout,
   isDarkMode,
-  toggleDarkMode
+  toggleDarkMode,
+  onEnableTwoFactor
 }) => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -48,6 +53,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [showHowToUseGuide, setShowHowToUseGuide] = useState(false);
 
   // ダークモードの設定
   useEffect(() => {
@@ -111,8 +117,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
     }
   };
 
+  // 使い方ガイドの表示/非表示を切り替え
+  const toggleHowToUseGuide = () => {
+    setShowHowToUseGuide(!showHowToUseGuide);
+  };
+
   // ダッシュボードのヘッダーを追加
-  const renderHeader = () => {
+  const Header = () => {
     return (
       <header className="bg-white dark:bg-gray-800 shadow">
         <div className="flex justify-between items-center px-4 py-6 sm:px-6 lg:px-8">
@@ -127,6 +138,14 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <h1 className="ml-4 text-xl font-bold text-gray-900 dark:text-white">CodeCoach</h1>
           </div>
           <div className="flex items-center space-x-4">
+            <button
+              type="button"
+              className="p-2 rounded-md text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none"
+              onClick={toggleHowToUseGuide}
+              aria-label="使い方ガイドを表示"
+            >
+              <HelpCircle className="h-5 w-5" />
+            </button>
             <button
               type="button"
               className="p-2 rounded-md text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none"
@@ -161,6 +180,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </button>
               {showUserMenu && (
                 <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-10">
+                  <button
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    onClick={onEnableTwoFactor}
+                  >
+                    2段階認証の設定
+                  </button>
                   <button
                     className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                     onClick={onLogout}
@@ -245,6 +270,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   推奨スキル
                 </button>
               </li>
+              <li>
+                <button
+                  onClick={toggleHowToUseGuide}
+                  className={`flex items-center w-full px-4 py-2 text-sm rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700`}
+                >
+                  <HelpCircle className="h-5 w-5 mr-3" />
+                  使い方
+                </button>
+              </li>
             </ul>
           </nav>
 
@@ -262,195 +296,75 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
       {/* メインコンテンツ */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <main className="flex-1 flex flex-col overflow-y-auto py-6 px-4 sm:px-6 lg:px-8">
-          <div className="flex-1">
-            {/* ヘッダー */}
-            {renderHeader()}
+        <Header />
 
-            {/* リポジトリ一覧 */}
-            {activeTab === 'repositories' && (
-              <div className="mt-6 bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-                <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-6">GitHubリポジトリ</h2>
-                {loading ? (
-                  <div className="flex justify-center py-12">
-                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
-                  </div>
-                ) : repositories.length > 0 ? (
-                  <div className="space-y-4">
-                    {repositories.map(repo => (
-                      <div
-                        key={repo.id}
-                        className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:bg-gray-50 dark:hover:bg-gray-750 cursor-pointer transition-colors"
-                        onClick={() => handleRepositorySelect(repo)}
-                      >
-                        <div className="flex items-start justify-between">
-                          <div>
-                            <h3 className="text-lg font-medium text-blue-600 dark:text-blue-400">
-                              {repo.name}
-                            </h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                              {repo.description || 'No description available'}
-                            </p>
-                          </div>
-                          <div className="flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-                            <span className="flex items-center">
-                              <svg className="h-4 w-4 mr-1 fill-current" viewBox="0 0 16 16">
-                                <path fillRule="evenodd" d="M8 .25a.75.75 0 01.673.418l1.882 3.815 4.21.612a.75.75 0 01.416 1.279l-3.046 2.97.719 4.192a.75.75 0 01-1.088.791L8 12.347l-3.766 1.98a.75.75 0 01-1.088-.79l.72-4.194L.818 6.374a.75.75 0 01.416-1.28l4.21-.611L7.327.668A.75.75 0 018 .25z" />
-                              </svg>
-                              {repo.stargazers_count}
-                            </span>
-                            <span className="flex items-center">
-                              <svg className="h-4 w-4 mr-1 fill-current" viewBox="0 0 16 16">
-                                <path fillRule="evenodd" d="M5 3.25a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm0 2.122a2.25 2.25 0 10-1.5 0v.878A2.25 2.25 0 005.75 8.5h1.5v2.128a2.251 2.251 0 101.5 0V8.5h1.5a2.25 2.25 0 002.25-2.25v-.878a2.25 2.25 0 10-1.5 0v.878a.75.75 0 01-.75.75h-4.5A.75.75 0 015 6.25v-.878zm3.75 7.378a.75.75 0 11-1.5 0 .75.75 0 011.5 0zm3-8.75a.75.75 0 100-1.5.75.75 0 000 1.5z" />
-                              </svg>
-                              {repo.forks_count}
-                            </span>
-                            <span className="px-2 py-1 text-xs rounded-full" style={{ 
-                              backgroundColor: repo.language === 'JavaScript' ? '#f1e05a30' : 
-                                              repo.language === 'TypeScript' ? '#3178c630' :
-                                              repo.language === 'Python' ? '#3572A530' : 
-                                              repo.language === 'Java' ? '#b0731630' : 
-                                              '#e8e8e880' 
-                            }}>
-                              {repo.language || 'Unknown'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <div className="flex justify-center">
-                      <Github className="h-16 w-16 text-gray-400 dark:text-gray-600" />
-                    </div>
-                    <p className="mt-4 text-gray-600 dark:text-gray-400">リポジトリが見つかりません。GitHubアカウントを接続してください。</p>
-                  </div>
-                )}
-              </div>
-            )}
+        <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 p-4 sm:p-6">
+          {activeTab === 'repositories' && (
+            <RepositoryList 
+              onSelectRepository={handleRepositorySelect}
+              selectedRepository={selectedRepository || undefined}
+            />
+          )}
 
-            {/* コード分析 */}
-            {activeTab === 'analysis' && selectedRepository && (
-              <div className="mt-6">
-                {analyzing ? (
-                  <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-12 text-center">
-                    <div className="flex justify-center">
-                      <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-blue-500"></div>
-                    </div>
-                    <p className="mt-6 text-gray-600 dark:text-gray-400">
-                      {selectedRepository.name} のコードを分析中です。しばらくお待ちください...
-                    </p>
+          {activeTab === 'analysis' && selectedRepository && (
+            <div className="space-y-4">
+              {analyzing ? (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mx-auto"></div>
+                  <p className="mt-4 text-gray-600 dark:text-gray-400">コードを分析中です。しばらくお待ちください...</p>
+                </div>
+              ) : analysisError ? (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8">
+                  <div className="flex items-center justify-center text-red-500 mb-4">
+                    <AlertCircle className="h-12 w-12" />
                   </div>
-                ) : analysisError ? (
-                  <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-12 text-center">
-                    <div className="flex justify-center">
-                      <AlertCircle className="h-16 w-16 text-red-500" />
-                    </div>
-                    <p className="mt-6 text-red-600 dark:text-red-400">{analysisError}</p>
+                  <h3 className="text-xl font-semibold text-center text-red-600 dark:text-red-400 mb-2">分析エラー</h3>
+                  <p className="text-center text-gray-600 dark:text-gray-400">{analysisError}</p>
+                  <div className="mt-6 text-center">
                     <button
                       onClick={() => selectedRepository && analyzeCode(selectedRepository)}
-                      className="mt-6 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none"
                     >
                       再試行
                     </button>
                   </div>
-                ) : analysisResults ? (
-                  <div className="space-y-6">
-                    <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-                      <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-6">
-                        {selectedRepository.name} の分析結果
-                      </h2>
-                      
-                      {/* 分析結果の詳細 */}
-                      <div className="mt-6">
-                        {analysisResults.files.map((file) => (
-                          <CodeAnalysisView 
-                            key={file.fileName}
-                            analysisResult={file} 
-                            fileName={file.fileName} 
-                          />
-                        ))}
-                      </div>
-                    </div>
+                </div>
+              ) : analysisResults ? (
+                analysisResults.files.map((fileResult, index) => (
+                  <CodeAnalysisView 
+                    key={index} 
+                    analysisResult={fileResult}
+                    fileName={fileResult.fileName}
+                  />
+                ))
+              ) : (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center">
+                  <div className="flex items-center justify-center text-yellow-500 mb-4">
+                    <AlertCircle className="h-12 w-12" />
                   </div>
-                ) : (
-                  <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-12 text-center">
-                    <div className="flex justify-center">
-                      <FileCode className="h-16 w-16 text-gray-400 dark:text-gray-600" />
-                    </div>
-                    <p className="mt-6 text-gray-600 dark:text-gray-400">
-                      分析を開始するには「分析開始」ボタンをクリックしてください。
-                    </p>
-                    <button
-                      onClick={() => selectedRepository && analyzeCode(selectedRepository)}
-                      className="mt-6 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      分析開始
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
+                  <h3 className="text-xl font-semibold text-center text-gray-900 dark:text-white mb-2">分析データがありません</h3>
+                  <p className="text-center text-gray-600 dark:text-gray-400">
+                    「リポジトリ一覧」から分析するリポジトリを選択してください。
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
-            {/* 推奨スキル */}
-            {activeTab === 'skills' && analysisResults && (
-              <div className="mt-6 bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-                <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-6">
-                  あなたにおすすめのスキル
-                </h2>
-                
-                {recommendedSkills.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {recommendedSkills.map(skill => (
-                      <div key={skill.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-5 hover:shadow-md transition-shadow">
-                        <div className="flex items-center justify-between mb-4">
-                          <h3 className="text-lg font-medium text-gray-800 dark:text-white">
-                            {skill.name}
-                          </h3>
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            skill.level === 'beginner' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                            skill.level === 'intermediate' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                            'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                          }`}>
-                            {skill.level === 'beginner' ? '初級' : 
-                             skill.level === 'intermediate' ? '中級' : '上級'}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                          {skill.description}
-                        </p>
-                        {skill.resourceUrl && (
-                          <a
-                            href={skill.resourceUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline"
-                          >
-                            学習リソースを見る
-                            <svg className="ml-1 h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M10.293 5.293a1 1 0 011.414 0l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414-1.414L12.586 11H5a1 1 0 110-2h7.586l-2.293-2.293a1 1 0 010-1.414z" clipRule="evenodd" />
-                            </svg>
-                          </a>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8">
-                    <div className="flex justify-center">
-                      <BookOpen className="h-12 w-12 text-gray-400 dark:text-gray-600" />
-                    </div>
-                    <p className="mt-4 text-gray-600 dark:text-gray-400">
-                      スキル推奨を表示するには、まずコード分析を完了させてください。
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          {activeTab === 'skills' && analysisResults && (
+            <SkillsAndLearningView 
+              recommendedSkills={recommendedSkills}
+              repoName={selectedRepository?.name || ''}
+              analysisResult={analysisResults}
+            />
+          )}
         </main>
       </div>
+      
+      {/* 使い方ガイドモーダル */}
+      {showHowToUseGuide && (
+        <HowToUseGuide onClose={toggleHowToUseGuide} />
+      )}
     </div>
   );
 };

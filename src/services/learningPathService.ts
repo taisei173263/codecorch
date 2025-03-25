@@ -5,7 +5,7 @@
 import firebase from 'firebase/app';
 import 'firebase/firestore';
 import { CodeAnalysisResult, RepositoryAnalysisResult, FileAnalysisResult } from './codeAnalysisService';
-import { db } from '../firebase/firebase';
+import { db } from '../firebase/services';
 
 /**
  * スキルレベルの定義

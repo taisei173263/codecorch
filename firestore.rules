@@ -1,0 +1,27 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ユーザーコレクションのルール - 認証済みユーザーは自分のドキュメントのみ操作可能
+    match /users/{userId} {
+      // 自分のドキュメントの読み書きを許可
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // 管理者ユーザーはすべてのユーザードキュメントにアクセス可能
+      allow read, write: if request.auth != null && exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+                          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true;
+    }
+    
+    // 他のコレクションには認証済みユーザーに読み取り許可、書き込みは制限
+    match /{collection}/{document} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+                    (collection != "users" || document == request.auth.uid);
+    }
+    
+    // すべてのサブコレクションに対するルール
+    match /{collection}/{document}/{subcollection}/{docId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null;
+    }
+  }
+}
