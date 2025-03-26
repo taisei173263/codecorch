@@ -40,35 +40,68 @@ const AuthScreen: React.FC<AuthScreenProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const handleGitHubSignIn = async () => {
-    setLoading(true);
-    setError(null);
-    
     try {
-      console.log('GitHub認証を開始します...');
+      console.log('================================================================');
+      console.log('GitHub認証ボタンがクリックされました - 認証処理を開始します');
+      setLoading(true);
+      setError(null);
       
-      // ポップアップウィンドウのCross-Origin問題を回避するためにリダイレクト認証に切り替え
-      // または既存のポップアップ認証の方法を維持しつつエラーハンドリングを改善
+      // ポップアップ認証を開始
+      console.log('GitHub認証関数を呼び出します...');
       const result = await onGithubLogin();
-      console.log('GitHub認証結果:', result);
+      console.log('GitHub認証の結果が返されました:', result);
       
+      // ポップアップ認証では結果が即座に返る
       if (!result.success) {
-        const errorMessage = result.error instanceof Error 
-          ? result.error.message 
-          : (result.error && typeof result.error === 'object' && 'code' in result.error)
-            ? `GitHub認証エラー: ${(result.error as any).code}`
-            : 'GitHub認証に失敗しました。もう一度お試しください。';
+        console.error('GitHub認証失敗 - エラー情報:', result.error);
+        
+        // エラーメッセージを設定
+        let errorMessage = '';
+        if (typeof result.error === 'string') {
+          errorMessage = result.error;
+          console.log('エラーメッセージ (文字列):', errorMessage);
+        } else if (result.error instanceof Error) {
+          errorMessage = result.error.message;
+          console.log('エラーメッセージ (Error):', errorMessage, 'スタック:', result.error.stack);
+        } else if (result.error && typeof result.error === 'object') {
+          console.log('エラーオブジェクト:', result.error);
+          if ('code' in result.error) {
+            const code = (result.error as any).code;
+            errorMessage = `GitHub認証エラー [${code}]: ${(result.error as any).message || ''}`;
+          } else {
+            errorMessage = JSON.stringify(result.error);
+          }
+        } else {
+          errorMessage = 'GitHub認証に失敗しました。もう一度お試しください。';
+          console.log('不明なエラー形式:', result.error);
+        }
+        
         setError(errorMessage);
-        return;
+        console.error('最終的に表示するエラーメッセージ:', errorMessage);
+      } else if (result.user) {
+        // 成功して即座にユーザー情報が返ってきた場合
+        console.log('GitHub認証成功! ユーザー情報:', {
+          uid: result.user.uid,
+          email: result.user.email,
+          displayName: result.user.displayName
+        });
+      } else {
+        console.log('GitHub認証は成功したがユーザー情報がありません');
       }
     } catch (error) {
-      console.error('GitHub login error:', error);
+      console.error('GitHub認証中に例外が発生しました:', error);
+      let errorMessage = 'GitHub認証に失敗しました。もう一度お試しください。';
+      
       if (error instanceof Error) {
-        setError(error.message);
-      } else {
-        setError('GitHub認証に失敗しました。もう一度お試しください。');
+        errorMessage = `エラー: ${error.message}`;
+        console.error('エラースタック:', error.stack);
       }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
+      console.log('GitHub認証処理完了');
+      console.log('================================================================');
     }
   };
 
@@ -166,7 +199,10 @@ const AuthScreen: React.FC<AuthScreenProps> = ({
           {error && (
             <div className="mb-4 p-3 flex items-center text-sm text-red-800 bg-red-100 rounded-md dark:bg-red-900/20 dark:text-red-300">
               <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
-              {error}
+              <div>
+                <p className="font-medium">{error}</p>
+                <p className="mt-1 text-xs">認証に問題がある場合は、別の方法でログインしてみてください。</p>
+              </div>
             </div>
           )}
 
@@ -176,17 +212,19 @@ const AuthScreen: React.FC<AuthScreenProps> = ({
                 onClick={handleGitHubSignIn}
                 disabled={loading}
                 className="w-full flex justify-center items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                aria-label="GitHubでログイン"
               >
                 <Github className="h-5 w-5" />
-                GitHub
+                <span>GitHub</span>
               </button>
               <button
                 onClick={handleGoogleSignIn}
                 disabled={loading}
                 className="w-full flex justify-center items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-700 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                aria-label="Googleでログイン"
               >
                 <Mail className="h-5 w-5" />
-                Google
+                <span>Google</span>
               </button>
             </div>
 

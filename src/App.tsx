@@ -43,15 +43,33 @@ function App() {
     const processRedirectResult = async () => {
       try {
         // リダイレクト認証からの結果を確認
+        console.log('App.tsx: リダイレクト認証結果の処理を開始');
         const result = await handleRedirectResult();
-        console.log('Redirect authentication result:', result.success);
+        console.log('App.tsx: リダイレクト認証結果:', result);
         
-        // エラーがあればセット
-        if (!result.success && result.error && result.error !== 'No authentication result') {
-          setError(`認証に失敗しました: ${result.error}`);
+        // エラーメッセージの処理を改善
+        if (!result.success) {
+          // 認証エラーかどうかを判断
+          const isAuthError = result.error && 
+            typeof result.error === 'string' &&
+            result.error !== 'No authentication result' && 
+            result.error !== 'No pending redirect' &&
+            result.error !== 'No user in authentication result';
+          
+          // 実際の認証エラーのみユーザーに表示
+          if (isAuthError) {
+            let errorMessage = typeof result.error === 'string' 
+              ? result.error 
+              : '認証に失敗しました。もう一度お試しください。';
+            
+            setError(errorMessage);
+          } else {
+            // 認証エラーでない場合はエラーメッセージをクリア
+            setError(null);
+          }
         }
       } catch (error) {
-        console.error('リダイレクト結果の処理中にエラー:', error);
+        console.error('App.tsx: リダイレクト結果の処理中にエラー:', error);
       }
     };
     
@@ -153,7 +171,15 @@ function App() {
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-100 dark:bg-gray-900">
-        <div className="text-red-500 dark:text-red-400">{error}</div>
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md max-w-md w-full">
+          <div className="text-red-500 dark:text-red-400 mb-4">{error}</div>
+          <button 
+            onClick={() => setError(null)}
+            className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            ログイン画面に戻る
+          </button>
+        </div>
       </div>
     );
   }

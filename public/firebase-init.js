@@ -38,8 +38,12 @@ window.global = window;
 window.process = window.process || { env: {} };
 
 // Firebase設定
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+// 開発環境でのFirebase設定
 const firebaseConfig = {
   apiKey: "AIzaSyB-hTYnbPzKioEN02HBqGPnS04NqvJXryY",
+  // 認証ドメインは常に本番環境のドメインを使用（重要）
   authDomain: "codecoach-61d26.firebaseapp.com",
   projectId: "codecoach-61d26",
   storageBucket: "codecoach-61d26.appspot.com",
@@ -48,6 +52,8 @@ const firebaseConfig = {
   measurementId: "G-DCBS6YVDZK",
   databaseURL: "https://codecoach-61d26-default-rtdb.asia-southeast1.firebasedatabase.app"
 };
+
+console.log('[firebase-init.js] Using authDomain:', firebaseConfig.authDomain);
 
 // Firebase初期化
 try {
