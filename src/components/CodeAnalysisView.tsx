@@ -22,7 +22,18 @@ interface FileAnalysisResult {
   namingScore: number;
   bestPracticesScore: number;
   issues: CodeIssue[];
+  scoreExplanations?: {
+    codeStyle: string;
+    naming: string;
+    complexity: string;
+    bestPractices: string;
+  };
 }
+
+// サポートされている言語リスト
+const SUPPORTED_LANGUAGES = [
+  'JavaScript', 'TypeScript', 'Python', 'Go', 'Java', 'C', 'C++', 'C#', 'Jupyter Notebook'
+];
 
 interface CodeAnalysisViewProps {
   analysisResult: FileAnalysisResult;
@@ -33,7 +44,8 @@ const CodeAnalysisView: React.FC<CodeAnalysisViewProps> = ({ analysisResult, fil
   const [expandedSections, setExpandedSections] = useState({
     overview: true,
     issues: true,
-    metrics: false
+    metrics: false,
+    explanations: false // スコア説明セクション
   });
 
   // セクションの展開/折りたたみを切り替え
@@ -140,6 +152,14 @@ const CodeAnalysisView: React.FC<CodeAnalysisViewProps> = ({ analysisResult, fil
         </h3>
       </div>
 
+      {/* サポート言語の注意書き */}
+      <div className="px-4 py-2 bg-blue-50 dark:bg-blue-900/20 text-xs text-blue-700 dark:text-blue-300">
+        <p>
+          <strong>注意:</strong> コード分析は現在、以下の言語のみをサポートしています: {SUPPORTED_LANGUAGES.join(', ')}。
+          Jupyter Notebookは.ipynbと.colabファイルをサポートしています。
+        </p>
+      </div>
+
       {/* 概要セクション */}
       <div className="border-b border-gray-200 dark:border-gray-700">
         <button
@@ -186,6 +206,59 @@ const CodeAnalysisView: React.FC<CodeAnalysisViewProps> = ({ analysisResult, fil
           </div>
         )}
       </div>
+
+      {/* スコアの詳細説明セクション */}
+      {analysisResult.scoreExplanations && (
+        <div className="border-b border-gray-200 dark:border-gray-700">
+          <button
+            className="w-full p-4 flex justify-between items-center bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none transition-colors"
+            onClick={() => toggleSection('explanations')}
+          >
+            <h4 className="font-medium text-gray-900 dark:text-white">スコアの詳細説明</h4>
+            {expandedSections.explanations ? (
+              <ChevronUp className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            )}
+          </button>
+
+          {expandedSections.explanations && (
+            <div className="p-4 space-y-4">
+              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                <div className="flex items-center mb-1">
+                  <span className={`inline-block w-2 h-2 rounded-full mr-2 ${getScoreColor(analysisResult.codeStyleScore).replace('text-', 'bg-')}`}></span>
+                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300">コードスタイル</div>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{analysisResult.scoreExplanations.codeStyle}</p>
+              </div>
+
+              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                <div className="flex items-center mb-1">
+                  <span className={`inline-block w-2 h-2 rounded-full mr-2 ${getScoreColor(analysisResult.namingScore).replace('text-', 'bg-')}`}></span>
+                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300">命名規則</div>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{analysisResult.scoreExplanations.naming}</p>
+              </div>
+
+              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                <div className="flex items-center mb-1">
+                  <span className={`inline-block w-2 h-2 rounded-full mr-2 ${getScoreColor(10 - analysisResult.complexityScore).replace('text-', 'bg-')}`}></span>
+                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300">複雑度</div>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{analysisResult.scoreExplanations.complexity}</p>
+              </div>
+
+              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
+                <div className="flex items-center mb-1">
+                  <span className={`inline-block w-2 h-2 rounded-full mr-2 ${getScoreColor(analysisResult.bestPracticesScore).replace('text-', 'bg-')}`}></span>
+                  <div className="text-sm font-medium text-gray-700 dark:text-gray-300">ベストプラクティス</div>
+                </div>
+                <p className="text-sm text-gray-600 dark:text-gray-400">{analysisResult.scoreExplanations.bestPractices}</p>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 問題点セクション */}
       <div className="border-b border-gray-200 dark:border-gray-700">

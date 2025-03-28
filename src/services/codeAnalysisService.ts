@@ -9,6 +9,16 @@ import { enhanceLearningRecommendation } from './tfService';
 
 let model: tf.LayersModel | null = null;
 
+// サポートされている言語の定義
+export const SUPPORTED_LANGUAGES = [
+  'javascript', 'typescript', 'python', 'go', 'java', 'c', 'cpp', 'csharp', 'jupyter'
+];
+
+// サポートされているファイル拡張子の定義
+export const SUPPORTED_EXTENSIONS = [
+  '.js', '.jsx', '.ts', '.tsx', '.py', '.go', '.java', '.c', '.cpp', '.cs', '.ipynb', '.colab'
+];
+
 // 結果型定義
 export interface CodeAnalysisResult {
   score: number;               // 総合スコア（0-100）
@@ -65,6 +75,12 @@ export interface FileAnalysisResult {
   namingScore: number;
   bestPracticesScore: number;
   issues: CodeIssue[];
+  scoreExplanations: {
+    codeStyle: string;
+    naming: string;
+    complexity: string;
+    bestPractices: string;
+  };
 }
 
 // リポジトリ分析結果型定義
@@ -193,8 +209,7 @@ const collectFiles = async (
   for (const item of contents) {
     if (item.type === 'file') {
       // コード分析対象の拡張子かチェック
-      const supportedExtensions = ['.js', '.jsx', '.ts', '.tsx', '.py', '.go', '.java', '.c', '.cpp', '.cs'];
-      if (supportedExtensions.some(ext => item.name.endsWith(ext))) {
+      if (SUPPORTED_EXTENSIONS.some(ext => item.name.toLowerCase().endsWith(ext))) {
         result.push({
           name: item.name,
           path: item.path
@@ -222,14 +237,46 @@ const analyzeFile = async (
   try {
     // ファイルの内容を取得
     const content = await getFileContent(owner, repo, path);
-    const lines = content.split('\n');
     
     // ファイルの言語を拡張子から判定
     const extension = fileName.split('.').pop()?.toLowerCase() || '';
     const language = getLanguageFromExtension(extension);
     
     // ファイルが空または言語が未サポートの場合はスキップ
-    if (lines.length === 0 || !language) {
+    if (!content || !language) {
+      return null;
+    }
+    
+    let lines: string[] = [];
+    let actualContent = content;
+    
+    // Jupyter Notebook形式(.ipynb, .colab)のファイルを処理
+    if (language === 'jupyter') {
+      try {
+        const notebookJson = JSON.parse(content);
+        // セルからPythonコードを抽出
+        const codeLines: string[] = [];
+        if (notebookJson.cells) {
+          notebookJson.cells.forEach((cell: any) => {
+            if (cell.cell_type === 'code') {
+              const cellSource = Array.isArray(cell.source) ? cell.source.join('') : cell.source;
+              codeLines.push(...cellSource.split('\n'));
+            }
+          });
+        }
+        lines = codeLines;
+        actualContent = codeLines.join('\n');
+      } catch (error) {
+        console.error(`JSONとしてJupyterノートブックを解析できません: ${path}`, error);
+        lines = content.split('\n');
+      }
+    } else {
+      // 通常のテキストファイル
+      lines = content.split('\n');
+    }
+    
+    // ファイルが空の場合はスキップ
+    if (lines.length === 0) {
       return null;
     }
     
@@ -237,13 +284,13 @@ const analyzeFile = async (
     const lineCount = lines.length;
     
     // コメント行をカウント
-    const commentCount = countCommentLines(lines, language);
+    const commentCount = countCommentLines(lines, language === 'jupyter' ? 'python' : language);
     
     // 関数数をカウント
-    const functionCount = countFunctions(content, language);
+    const functionCount = countFunctions(actualContent, language === 'jupyter' ? 'python' : language);
     
     // 最大ネスト深度を計算
-    const maxNestingDepth = calculateMaxNestingDepth(content, language);
+    const maxNestingDepth = calculateMaxNestingDepth(actualContent, language === 'jupyter' ? 'python' : language);
     
     // TensorFlow.jsを使用してコード品質分析
     const analysisFeatures = [
@@ -281,11 +328,17 @@ const analyzeFile = async (
     }
     
     // 静的分析による問題検出
-    const issues = detectIssues(content, language, lines);
+    const issues = detectIssues(actualContent, language === 'jupyter' ? 'python' : language, lines);
+    
+    // 各スコアの詳細な説明を生成
+    const codeStyleExplanation = getScoreExplanation('codeStyle', codeStyleScore, language);
+    const namingExplanation = getScoreExplanation('naming', namingScore, language);
+    const complexityExplanation = getScoreExplanation('complexity', complexityScore, language);
+    const bestPracticesExplanation = getScoreExplanation('bestPractices', bestPracticesScore, language);
     
     return {
       fileName,
-      language,
+      language: language === 'jupyter' ? 'python (notebook)' : language,
       lineCount,
       commentCount,
       functionCount,
@@ -294,7 +347,14 @@ const analyzeFile = async (
       codeStyleScore,
       namingScore,
       bestPracticesScore,
-      issues
+      issues,
+      // 各スコアの説明を追加
+      scoreExplanations: {
+        codeStyle: codeStyleExplanation,
+        naming: namingExplanation,
+        complexity: complexityExplanation,
+        bestPractices: bestPracticesExplanation
+      }
     };
   } catch (error) {
     console.error(`Error analyzing file ${path}:`, error);
@@ -312,6 +372,8 @@ const getLanguageFromExtension = (extension: string): string | null => {
     'ts': 'typescript',
     'tsx': 'typescript',
     'py': 'python',
+    'ipynb': 'jupyter',
+    'colab': 'jupyter',
     'go': 'go',
     'java': 'java',
     'c': 'c',
@@ -323,76 +385,95 @@ const getLanguageFromExtension = (extension: string): string | null => {
 };
 
 /**
- * コメント行数をカウント
+ * コメント行をカウント
  */
 const countCommentLines = (lines: string[], language: string): number => {
   let count = 0;
-  let inMultilineComment = false;
+  let inMultiLineComment = false;
   
-  for (const line of lines) {
+  // Jupyter Notebookはpythonとして処理
+  const effectiveLanguage = language === 'jupyter' ? 'python' : language;
+  
+  lines.forEach(line => {
     const trimmedLine = line.trim();
     
-    // 空行はスキップ
-    if (trimmedLine === '') continue;
+    if (trimmedLine === '') return;
     
-    switch (language) {
+    switch (effectiveLanguage) {
       case 'javascript':
       case 'typescript':
-        // 複数行コメントの処理
-        if (inMultilineComment) {
+        // 複数行コメントの開始チェック
+        if (trimmedLine.includes('/*') && !trimmedLine.includes('*/')) {
+          inMultiLineComment = true;
           count++;
-          if (trimmedLine.includes('*/')) {
-            inMultilineComment = false;
-          }
-          continue;
+          return;
+        }
+        
+        // 複数行コメントの終了チェック
+        if (inMultiLineComment && trimmedLine.includes('*/')) {
+          inMultiLineComment = false;
+          count++;
+          return;
+        }
+        
+        // 複数行コメント中
+        if (inMultiLineComment) {
+          count++;
+          return;
         }
         
         // 単一行コメント
         if (trimmedLine.startsWith('//')) {
           count++;
-        }
-        // 複数行コメント開始
-        else if (trimmedLine.startsWith('/*')) {
-          count++;
-          if (!trimmedLine.includes('*/')) {
-            inMultilineComment = true;
-          }
+          return;
         }
         break;
-        
+      
       case 'python':
-        // Pythonの複数行文字列コメントの処理は簡略化
+        // 複数行コメントの開始チェック
+        if (trimmedLine.startsWith('"""') || trimmedLine.startsWith("'''")) {
+          const hasClosingQuote = (
+            (trimmedLine.startsWith('"""') && trimmedLine.substring(3).includes('"""')) ||
+            (trimmedLine.startsWith("'''") && trimmedLine.substring(3).includes("'''"))
+          );
+          
+          if (!hasClosingQuote) {
+            inMultiLineComment = true;
+          }
+          
+          count++;
+          return;
+        }
+        
+        // 複数行コメントの終了チェック
+        if (inMultiLineComment && (trimmedLine.endsWith('"""') || trimmedLine.endsWith("'''"))) {
+          inMultiLineComment = false;
+          count++;
+          return;
+        }
+        
+        // 複数行コメント中
+        if (inMultiLineComment) {
+          count++;
+          return;
+        }
+        
+        // 単一行コメント
         if (trimmedLine.startsWith('#')) {
           count++;
+          return;
         }
         break;
-        
-      case 'go':
-        if (inMultilineComment) {
-          count++;
-          if (trimmedLine.includes('*/')) {
-            inMultilineComment = false;
-          }
-          continue;
-        }
-        
-        if (trimmedLine.startsWith('//')) {
-          count++;
-        } else if (trimmedLine.startsWith('/*')) {
-          count++;
-          if (!trimmedLine.includes('*/')) {
-            inMultilineComment = true;
-          }
-        }
-        break;
-        
+      
+      // 他の言語も同様に処理...
       default:
-        // その他の言語は簡易的に処理
-        if (trimmedLine.startsWith('//') || trimmedLine.startsWith('#') || trimmedLine.startsWith('/*')) {
+        // 基本的なコメント検出（# または // で始まる行）
+        if (trimmedLine.startsWith('#') || trimmedLine.startsWith('//')) {
           count++;
+          return;
         }
     }
-  }
+  });
   
   return count;
 };
@@ -433,65 +514,70 @@ const countFunctions = (content: string, language: string): number => {
 };
 
 /**
- * 最大ネスト深度を計算
+ * コードの最大ネスト深度を計算
  */
 const calculateMaxNestingDepth = (content: string, language: string): number => {
+  // Jupyter Notebookはpythonとして処理
+  const effectiveLanguage = language === 'jupyter' ? 'python' : language;
+  
+  // 行ごとに処理
   const lines = content.split('\n');
+  
   let maxDepth = 0;
   let currentDepth = 0;
   
-  for (const line of lines) {
-    const trimmedLine = line.trim();
-    
-    // 言語ごとのネスト増加と減少のパターン
-    let increasePattern: RegExp;
-    let decreasePattern: RegExp;
-    
-    switch (language) {
-      case 'javascript':
-      case 'typescript':
-        // 中括弧でネスト深度を判定
-        if (trimmedLine.includes('{')) {
-          currentDepth += (trimmedLine.match(/{/g) || []).length;
+  switch (effectiveLanguage) {
+    case 'javascript':
+    case 'typescript':
+      // 単純な括弧カウント（より正確には構文解析が必要）
+      for (const line of lines) {
+        for (const char of line) {
+          if (char === '{') {
+            currentDepth++;
+            maxDepth = Math.max(maxDepth, currentDepth);
+          } else if (char === '}') {
+            currentDepth = Math.max(0, currentDepth - 1);
+          }
         }
-        if (trimmedLine.includes('}')) {
-          currentDepth -= (trimmedLine.match(/}/g) || []).length;
+      }
+      break;
+      
+    case 'python':
+      // インデントによるネスト深度を計算
+      let lastIndentLevel = 0;
+      for (const line of lines) {
+        const trimmedLine = line.trim();
+        if (trimmedLine === '' || trimmedLine.startsWith('#')) {
+          continue;
         }
-        break;
         
-      case 'python':
-        // インデントでネスト深度を判定する正確な方法は複雑なので、ここでは簡易的に:で終わる行で増加と仮定
-        if (trimmedLine.endsWith(':')) {
-          currentDepth++;
-        }
-        // Pythonのネスト減少の検出は複雑なため、この簡易実装では省略
-        break;
+        // インデントレベルを計算
+        const indentLevel = line.length - line.trimStart().length;
+        const currentIndentLevel = Math.ceil(indentLevel / 4); // 4スペースをPythonの標準インデントとして扱う
         
-      case 'go':
-        // 中括弧でネスト深度を判定
-        if (trimmedLine.includes('{')) {
-          currentDepth += (trimmedLine.match(/{/g) || []).length;
+        if (currentIndentLevel > lastIndentLevel) {
+          currentDepth += (currentIndentLevel - lastIndentLevel);
+          maxDepth = Math.max(maxDepth, currentDepth);
+        } else if (currentIndentLevel < lastIndentLevel) {
+          currentDepth -= (lastIndentLevel - currentIndentLevel);
         }
-        if (trimmedLine.includes('}')) {
-          currentDepth -= (trimmedLine.match(/}/g) || []).length;
-        }
-        break;
         
-      default:
-        // デフォルトでは中括弧でネスト深度を判定
-        if (trimmedLine.includes('{')) {
-          currentDepth += (trimmedLine.match(/{/g) || []).length;
+        lastIndentLevel = currentIndentLevel;
+      }
+      break;
+      
+    default:
+      // 単純な括弧カウントによる簡易計算
+      for (const line of lines) {
+        for (const char of line) {
+          if (char === '{' || char === '(') {
+            currentDepth++;
+            maxDepth = Math.max(maxDepth, currentDepth);
+          } else if (char === '}' || char === ')') {
+            currentDepth = Math.max(0, currentDepth - 1);
+          }
         }
-        if (trimmedLine.includes('}')) {
-          currentDepth -= (trimmedLine.match(/}/g) || []).length;
-        }
-    }
-    
-    // 負の深度にならないように調整
-    currentDepth = Math.max(0, currentDepth);
-    
-    // 最大深度を更新
-    maxDepth = Math.max(maxDepth, currentDepth);
+      }
   }
   
   return maxDepth;
@@ -644,6 +730,74 @@ const calculateOverallScore = (fileResults: FileAnalysisResult[]): number => {
   
   // 0-100の範囲に正規化
   return Math.round((totalScore / fileResults.length) * 10);
+};
+
+/**
+ * 各スコアの詳細な説明を生成
+ */
+export const getScoreExplanation = (scoreType: string, score: number, language: string): string => {
+  // スコアの範囲に基づいた評価レベル
+  const level = score >= 8 ? '優れている' : score >= 6 ? '良好' : score >= 4 ? '改善の余地あり' : '要改善';
+  
+  // 言語別にカスタマイズされた説明（必要に応じて拡張可能）
+  const languageSpecific = language === 'python' || language === 'jupyter' 
+    ? 'Pythonでは' 
+    : language === 'javascript' || language === 'typescript' 
+      ? 'JavaScriptでは' 
+      : '';
+  
+  switch (scoreType) {
+    case 'codeStyle':
+      // コードスタイルの説明
+      if (score >= 8) {
+        return `${level}：コードは一貫したスタイルで整形されており、読みやすさが高いです。${languageSpecific}適切なインデントやスペース、改行が使われています。`;
+      } else if (score >= 6) {
+        return `${level}：コードスタイルは概ね良好ですが、一部に改善の余地があります。${languageSpecific}インデントや行の長さに注意すると良いでしょう。`;
+      } else if (score >= 4) {
+        return `${level}：コードスタイルにいくつかの問題があります。${languageSpecific}一貫したインデント、適切な行の長さ、読みやすいコードブロックの構成を心がけましょう。`;
+      } else {
+        return `${level}：コードスタイルに重大な問題があります。${languageSpecific}コードフォーマッターの使用や、スタイルガイドに従った書き方を検討してください。`;
+      }
+      
+    case 'naming':
+      // 命名規則の説明
+      if (score >= 8) {
+        return `${level}：変数や関数の命名が明確で、理解しやすいコードになっています。${languageSpecific}適切な命名規則に従っています。`;
+      } else if (score >= 6) {
+        return `${level}：命名は概ね適切ですが、一部に改善の余地があります。${languageSpecific}より説明的な変数名や一貫した命名規則を検討してください。`;
+      } else if (score >= 4) {
+        return `${level}：命名にいくつかの問題があります。${languageSpecific}短すぎる変数名、混同しやすい名前、一貫性のない命名パターンがあります。`;
+      } else {
+        return `${level}：命名に重大な問題があります。${languageSpecific}意味のある変数名を使用し、言語の標準的な命名規則に従ってください。`;
+      }
+      
+    case 'complexity':
+      // 複雑性スコアの説明（値が低いほど良い）
+      if (score <= 3) {
+        return `${level}：コードの複雑性は非常に低く、理解しやすい構造になっています。${languageSpecific}適切な関数分割と浅いネストレベルを維持しています。`;
+      } else if (score <= 5) {
+        return `${level}：コードの複雑性は適切なレベルです。${languageSpecific}大部分のコードは理解しやすいですが、一部の関数はより小さな単位に分割できる可能性があります。`;
+      } else if (score <= 7) {
+        return `${level}：コードの複雑性がやや高く、理解しづらい部分があります。${languageSpecific}深いネストや長すぎる関数を分割することを検討してください。`;
+      } else {
+        return `${level}：コードの複雑性が非常に高く、保守が困難です。${languageSpecific}関数を小さな単位に分割し、ネストを減らし、複雑なロジックをシンプルにすることを強く推奨します。`;
+      }
+      
+    case 'bestPractices':
+      // ベストプラクティスの説明
+      if (score >= 8) {
+        return `${level}：コードは業界のベストプラクティスに従っています。${languageSpecific}適切なエラー処理、効率的なアルゴリズム、安全なコーディング手法が使われています。`;
+      } else if (score >= 6) {
+        return `${level}：ベストプラクティスは概ね守られていますが、改善の余地があります。${languageSpecific}エラー処理やコードの効率性を見直してみてください。`;
+      } else if (score >= 4) {
+        return `${level}：ベストプラクティスにいくつかの問題があります。${languageSpecific}エラー処理の追加、効率的なアルゴリズムの使用、冗長なコードの削減を検討してください。`;
+      } else {
+        return `${level}：ベストプラクティスに重大な問題があります。${languageSpecific}言語の標準的なプラクティスに従ったコードリファクタリングを検討してください。`;
+      }
+      
+    default:
+      return `スコア ${score}/10：詳細な分析情報はありません。`;
+  }
 };
 
 export default {
