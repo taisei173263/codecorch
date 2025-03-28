@@ -53,6 +53,26 @@ CodeCoachは、AIを活用したコード分析とパーソナライズされた
    npm run build
    ```
 
+## Environment Setup
+
+To set up the environment variables for Firebase:
+
+1. Create a `.env.local` file in the project root
+2. Add your Firebase configuration variables to this file:
+
+```
+VITE_FIREBASE_API_KEY=your-api-key
+VITE_FIREBASE_AUTH_DOMAIN=your-app.firebaseapp.com
+VITE_FIREBASE_PROJECT_ID=your-project-id
+VITE_FIREBASE_STORAGE_BUCKET=your-storage-bucket.appspot.com
+VITE_FIREBASE_MESSAGING_SENDER_ID=your-messaging-sender-id
+VITE_FIREBASE_APP_ID=your-app-id
+VITE_FIREBASE_MEASUREMENT_ID=your-measurement-id
+VITE_FIREBASE_DATABASE_URL=your-database-url
+```
+
+⚠️ **Security Note**: Never commit API keys or secrets to the repository. The `.env.local` file is ignored by Git.
+
 ## Firebaseのセットアップ
 
 1. [Firebase Console](https://console.firebase.google.com/)でプロジェクトを作成します

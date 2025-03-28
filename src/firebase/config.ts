@@ -1,19 +1,19 @@
-// Firebase設定 - ハードコードした値を使用
+// Firebase設定 - 環境変数から値を取得
 const firebaseConfig = {
-  apiKey: "AIzaSyB-hTYnbPzKioEN02HBqGPnS04NqvJXryY",
-  authDomain: "codecoach-61d26.firebaseapp.com",
-  projectId: "codecoach-61d26",
-  storageBucket: "codecoach-61d26.appspot.com",
-  messagingSenderId: "313757336409",
-  appId: "1:313757336409:web:b73f3d69835f848975c248",
-  measurementId: "G-DCBS6YVDZK",
-  databaseURL: "https://codecoach-61d26-default-rtdb.asia-southeast1.firebasedatabase.app"
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL
 };
 
 export { firebaseConfig };
 
 // デバッグログ
-console.log('Config loaded with fixed values:', {
+console.log('Config loaded from environment variables:', {
   projectId: firebaseConfig.projectId,
   hasApiKey: Boolean(firebaseConfig.apiKey),
   hasAuthDomain: Boolean(firebaseConfig.authDomain),
@@ -33,6 +33,16 @@ if (!firebaseConfig.apiKey) {
 } else {
   console.log('Firebase API キーが正しく読み込まれました');
 }
+
+// 注: .env.local ファイルに以下の環境変数を設定してください:
+// VITE_FIREBASE_API_KEY=your-api-key
+// VITE_FIREBASE_AUTH_DOMAIN=your-app.firebaseapp.com
+// VITE_FIREBASE_PROJECT_ID=your-project-id
+// VITE_FIREBASE_STORAGE_BUCKET=your-storage-bucket
+// VITE_FIREBASE_MESSAGING_SENDER_ID=your-sender-id
+// VITE_FIREBASE_APP_ID=your-app-id
+// VITE_FIREBASE_MEASUREMENT_ID=your-measurement-id
+// VITE_FIREBASE_DATABASE_URL=your-database-url
 
 // 本番環境用に.envファイルまたは環境変数を設定してください
 // 例: 
