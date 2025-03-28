@@ -37,13 +37,13 @@
 window.global = window;
 window.process = window.process || { env: {} };
 
-// Firebase設定
+// Firebase設定を環境変数から読み込むよう修正
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
-// 開発環境でのFirebase設定
-const firebaseConfig = {
-  apiKey: "AIzaSyB-hTYnbPzKioEN02HBqGPnS04NqvJXryY",
-  // 認証ドメインは常に本番環境のドメインを使用（重要）
+// 環境変数から設定を取得
+// 注: 実際にはindex.htmlで<script>タグを使って環境変数を注入する必要があります
+const firebaseConfig = window.ENV_CONFIG?.FIREBASE || {
+  apiKey: "",
   authDomain: "codecoach-61d26.firebaseapp.com",
   projectId: "codecoach-61d26",
   storageBucket: "codecoach-61d26.appspot.com",
