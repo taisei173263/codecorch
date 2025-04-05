@@ -12,7 +12,7 @@ import HowToUseGuide from './HowToUseGuide';
 import CodeImprovementView from './CodeImprovementView';
 import { Skill } from '../services/learningPathService';
 import { getUserRepositories, Repository, getRepositoryContents, getFileContent } from '../services/githubService';
-import { analyzeRepository, RepositoryAnalysisResult, FileAnalysisResult, CodeIssue, SUPPORTED_EXTENSIONS } from '../services/codeAnalysisService';
+import codeAnalysisService, { RepositoryAnalysisResult, FileAnalysisResult, CodeIssue } from '../services/codeAnalysisService';
 import { generateLearningPath } from '../services/learningPathService';
 import { generateCodeImprovements, prepareImprovementUIData } from '../services/codeImprovementService';
 
@@ -120,13 +120,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
   // ファイルが分析対象かどうかをチェック
   const isAnalyzableFile = (fileName: string): boolean => {
-    return SUPPORTED_EXTENSIONS.some(ext => fileName.toLowerCase().endsWith(ext));
+    return codeAnalysisService.SUPPORTED_EXTENSIONS.some(ext => fileName.toLowerCase().endsWith(ext));
   };
 
   // ファイルを選択して分析
   const handleFileSelect = async (filePath: string, fileName: string) => {
     if (!isAnalyzableFile(fileName)) {
-      setAnalysisError(`${fileName} は分析対象のファイル形式ではありません。サポートされている拡張子: ${SUPPORTED_EXTENSIONS.join(', ')}`);
+      setAnalysisError(`${fileName} は分析対象のファイル形式ではありません。サポートされている拡張子: ${codeAnalysisService.SUPPORTED_EXTENSIONS.join(', ')}`);
       return;
     }
     
@@ -143,7 +143,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
     
     try {
       // Githubリポジトリの分析を実行
-      const results = await analyzeRepository(repo.full_name, filePath);
+      const results = await codeAnalysisService.analyzeRepository(repo.full_name, filePath);
       
       // 分析結果を設定
       setAnalysisResults(results);
