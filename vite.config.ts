@@ -48,5 +48,5 @@ export default defineConfig({
   optimizeDeps: {
     include: ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/database']
   },
-  base: '/codecoach/',
+  // base: '/codecoach/', // NetlifyにデプロイするためコメントアウトもしくはPRODUCTION_MODEに応じて変更
 }) 
