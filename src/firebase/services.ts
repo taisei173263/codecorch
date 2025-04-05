@@ -211,8 +211,8 @@ export const signInWithGithub = async (): Promise<AuthResult> => {
     // ネットワーク接続の確認
     if (!navigator.onLine) {
       console.error('ネットワーク接続がありません');
-      return {
-        success: false,
+      return { 
+        success: false, 
         error: new Error('インターネット接続がありません。ネットワーク設定を確認してください。'),
         message: 'インターネット接続がありません'
       };
@@ -222,6 +222,12 @@ export const signInWithGithub = async (): Promise<AuthResult> => {
     const GithubAuthProvider = firebase.auth.GithubAuthProvider;
     const provider = new GithubAuthProvider();
     provider.addScope('repo');
+    
+    // 明示的にリダイレクトURLを設定
+    const netlifyURL = 'https://codecoach2025.netlify.app/';
+    provider.setCustomParameters({
+      redirect_uri: netlifyURL
+    });
     
     // ログインの状態をコンソールに出力
     const beforeAuth = await auth.currentUser;
@@ -235,10 +241,10 @@ export const signInWithGithub = async (): Promise<AuthResult> => {
       // 認証結果からGitHubのトークンを取得
       const credential = result.credential;
       const token = credential ? (credential as any).accessToken : null;
-      
-      if (token) {
+            
+            if (token) {
         console.log('GitHub認証成功: アクセストークンを保存します');
-        localStorage.setItem('github_token', token);
+              localStorage.setItem('github_token', token);
         localStorage.setItem('last_github_login', new Date().toISOString());
       } else {
         console.error('GitHub認証は成功しましたが、トークンが取得できませんでした');
@@ -259,14 +265,14 @@ export const signInWithGithub = async (): Promise<AuthResult> => {
         try {
           // リダイレクト認証に切り替え
           await auth.signInWithRedirect(provider);
-          return {
+              return { 
             success: true,
             message: 'GitHubログインページにリダイレクトしています。認証後に自動的に戻ります。'
           };
         } catch (redirectError) {
           console.error('リダイレクト認証の設定に失敗:', redirectError);
-          return {
-            success: false,
+              return {
+                success: false,
             error: redirectError,
             message: 'GitHubログインページへのリダイレクトに失敗しました。'
           };
@@ -295,8 +301,8 @@ export const signInWithGithub = async (): Promise<AuthResult> => {
           };
         } catch (fetchError) {
           console.error('認証方法の取得中にエラー:', fetchError);
-          return {
-            success: false,
+            return { 
+              success: false, 
             error: fetchError,
             message: '認証に関する情報が取得できませんでした。別の認証方法をお試しください。'
           };
