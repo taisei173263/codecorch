@@ -24,32 +24,28 @@ export default defineConfig({
   ],
   server: {
     port: 5173,
-    open: true
+    open: true,
+    hmr: {
+      overlay: false // エラーオーバーレイを無効化
+    }
   },
   define: {
     'process.env': process.env,
-    global: 'window',
-    'global.XMLHttpRequest': 'window.XMLHttpRequest'
+    global: 'window'
   },
   resolve: {
-    alias: {
-      'xmlhttprequest': resolve(__dirname, './node_modules/xmlhttprequest'),
-      util: 'util',
-      process: 'process/browser'
-    }
+    alias: [
+      { find: 'process', replacement: 'process/browser' },
+      { find: 'util', replacement: 'util/' }
+    ]
   },
   build: {
     commonjsOptions: {
-      transformMixedEsModules: true,
-    },
+      include: [/node_modules/],
+      transformMixedEsModules: true
+    }
   },
   optimizeDeps: {
-    esbuildOptions: {
-      // Node.js global to browser globalThis
-      define: {
-        global: 'globalThis'
-      }
-    },
-    include: ['util', 'process/browser', 'firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/database']
+    include: ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/database']
   }
 }) 

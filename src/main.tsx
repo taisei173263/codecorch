@@ -1,3 +1,6 @@
+// processポリフィルをインポート
+import './process-browser-polyfill';
+
 // メインエントリポイント
 import React from 'react'
 import ReactDOM from 'react-dom/client'

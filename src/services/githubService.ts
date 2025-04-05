@@ -48,8 +48,19 @@ const getGithubToken = (): string | null => {
   // ローカルストレージからGitHubトークンを取得
   const token = localStorage.getItem('github_token');
   
-  // デバッグ用にトークンの有無をログ出力（実際のトークンは出力しない）
-  console.log('GitHub token available:', !!token);
+  // より詳細なデバッグ情報
+  if (token) {
+    console.log('GitHub token found - prefix:', token.substring(0, 5) + '...', 'length:', token.length);
+  } else {
+    console.error('GitHub token not found in localStorage');
+    // 現在のlocalStorageの状態を確認
+    try {
+      const keys = Object.keys(localStorage);
+      console.log('Available localStorage keys:', keys);
+    } catch (e) {
+      console.error('Error accessing localStorage:', e);
+    }
+  }
   
   return token;
 };
@@ -60,6 +71,8 @@ const fetchFromGithub = async (endpoint: string, options?: RequestInit) => {
   
   if (!token) {
     console.error('GitHub access token is missing. Please login with GitHub again.');
+    // 認証状態をクリア
+    localStorage.removeItem('github_token');
     throw new Error('GitHub access token not found. Please login with GitHub again.');
   }
 
@@ -69,34 +82,73 @@ const fetchFromGithub = async (endpoint: string, options?: RequestInit) => {
       Authorization: `token ${token}`,
       Accept: 'application/vnd.github.v3+json',
     },
+    // キャッシュを無効化して常に最新データを取得
+    cache: 'no-store',
   };
 
+  console.log(`Making GitHub API request to: ${endpoint}`);
+  
   try {
+    // API呼び出し前のタイムスタンプ
+    const startTime = Date.now();
+    
     const response = await fetch(url, { ...defaultOptions, ...options });
+    
+    // API呼び出し後のタイムスタンプと所要時間
+    const endTime = Date.now();
+    console.log(`GitHub API response received in ${endTime - startTime}ms. Status: ${response.status}`);
     
     if (response.status === 401) {
       // 認証エラー - トークンが無効または期限切れ
       console.error('GitHub token is invalid or expired. Clearing from storage.');
       localStorage.removeItem('github_token');
-      throw new Error('GitHub authentication expired. Please login again.');
+      // 例外スタックトレースを含める
+      const error = new Error('GitHub authentication expired. Please login again.');
+      console.error('Token validation error:', error.stack);
+      throw error;
     }
     
     if (response.status === 403 && response.headers.get('X-RateLimit-Remaining') === '0') {
       // レート制限に達した
       const resetTime = response.headers.get('X-RateLimit-Reset');
       const resetDate = resetTime ? new Date(parseInt(resetTime) * 1000).toLocaleTimeString() : 'unknown time';
+      console.warn('GitHub API rate limit exceeded');
       throw new Error(`GitHub API rate limit exceeded. Resets at ${resetDate}`);
     }
     
     if (!response.ok) {
-      const error = await response.text();
-      console.error(`GitHub API error: ${response.status}`, error);
-      throw new Error(`GitHub API error: ${response.status} - ${error}`);
+      // エラーレスポンスの詳細情報を取得
+      let errorData;
+      try {
+        errorData = await response.json();
+        console.error('GitHub API error details:', errorData);
+      } catch (e) {
+        const errorText = await response.text();
+        console.error('GitHub API error response:', errorText);
+      }
+      
+      throw new Error(`GitHub API error: ${response.status} - ${response.statusText}`);
     }
     
-    return response.json();
+    // レスポンスをデバッグ
+    const data = await response.json();
+    
+    // リポジトリ一覧の場合は件数をログ出力
+    if (Array.isArray(data) && endpoint.includes('/repos')) {
+      console.log(`Fetched ${data.length} repositories from GitHub API`);
+    }
+    
+    return data;
   } catch (error) {
-    console.error('GitHub API request failed:', error);
+    console.error(`GitHub API request failed for ${url}:`, error);
+    // リクエスト失敗時に詳細なエラー情報を記録
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      });
+    }
     throw error;
   }
 };

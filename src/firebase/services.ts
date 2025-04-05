@@ -16,6 +16,38 @@ const auth = window._FIREBASE_AUTH;
 const db = window._FIREBASE_FIRESTORE;
 const rtdb = window._FIREBASE_DATABASE;
 
+// 開発環境の場合、Firebase Emulatorに接続
+if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_USE_EMULATOR === 'true') {
+  // Emulatorのホストとポートを設定
+  const authEmulatorHost = process.env.REACT_APP_AUTH_EMULATOR_HOST || 'localhost:9099';
+  const firestoreEmulatorHost = process.env.REACT_APP_FIRESTORE_EMULATOR_HOST || 'localhost:8080';
+  const databaseEmulatorHost = process.env.REACT_APP_DATABASE_EMULATOR_HOST || 'localhost:9000';
+  
+  // Emulator接続設定
+  if (auth) {
+    auth.useEmulator(`http://${authEmulatorHost}`);
+    console.log(`Firebase Auth Emulator connected at ${authEmulatorHost}`);
+  }
+  
+  if (db) {
+    db.useEmulator(
+      firestoreEmulatorHost.split(':')[0], 
+      parseInt(firestoreEmulatorHost.split(':')[1])
+    );
+    console.log(`Firestore Emulator connected at ${firestoreEmulatorHost}`);
+  }
+  
+  if (rtdb) {
+    rtdb.useEmulator(
+      databaseEmulatorHost.split(':')[0], 
+      parseInt(databaseEmulatorHost.split(':')[1])
+    );
+    console.log(`Realtime Database Emulator connected at ${databaseEmulatorHost}`);
+  }
+  
+  console.log('Firebase Emulators enabled for development');
+}
+
 console.log('Firebase services.ts loaded, firebase instance:', !!firebase);
 
 // Firebaseサービスをエクスポート
@@ -157,133 +189,133 @@ const getNetworkErrorDetails = async () => {
   }
 };
 
+// 認証結果の型定義
+interface AuthResult {
+  success: boolean;
+  user?: any;
+  error?: any;
+  message?: string;
+  githubToken?: string;
+  linked?: boolean;
+  email?: string;
+  methods?: string[];
+  errorType?: string;
+  errorDetails?: any;
+}
+
 // GitHub OAuth認証
-export const signInWithGithub = async () => {
+export const signInWithGithub = async (): Promise<AuthResult> => {
+  console.log('GitHub認証を開始します');
+  
   try {
-    console.log('================================================================');
-    console.log('[services.ts] GitHub認証を開始...');
-    
-    // ネットワーク接続を確認
-    const isConnected = await checkNetworkConnection();
-    if (!isConnected) {
-      return { 
-        success: false, 
-        error: 'ネットワーク接続がありません。インターネット接続を確認してください。' 
+    // ネットワーク接続の確認
+    if (!navigator.onLine) {
+      console.error('ネットワーク接続がありません');
+      return {
+        success: false,
+        error: new Error('インターネット接続がありません。ネットワーク設定を確認してください。'),
+        message: 'インターネット接続がありません'
       };
     }
+
+    // 認証プロバイダ設定
+    const GithubAuthProvider = firebase.auth.GithubAuthProvider;
+    const provider = new GithubAuthProvider();
+    provider.addScope('repo');
     
-    // GitHubプロバイダーの設定
-    const githubProvider = new firebase.auth.GithubAuthProvider();
-    console.log('[services.ts] GitHubプロバイダーを作成しました');
+    // ログインの状態をコンソールに出力
+    const beforeAuth = await auth.currentUser;
+    console.log('認証前のユーザー状態:', beforeAuth ? 'ログイン中' : '未ログイン');
     
-    // Firebase設定とGitHubプロバイダーの詳細をログ出力
-    const firebaseConfig = firebase.app().options;
-    console.log('[services.ts] Firebase設定詳細:', {
-      authDomain: firebaseConfig.authDomain,
-      projectId: firebaseConfig.projectId,
-      apiKey: firebaseConfig.apiKey ? '存在します' : 'ありません',
-      appId: firebaseConfig.appId ? '存在します' : 'ありません'
-    });
-    
-    // スコープの設定
-    githubProvider.addScope('read:user');
-    githubProvider.addScope('user:email');
-    githubProvider.addScope('repo');
-    console.log('[services.ts] GitHubスコープを設定しました: read:user, user:email, repo');
-    
-    // 重要なカスタムパラメータを設定
-    githubProvider.setCustomParameters({
-      'allow_signup': 'true'
-    });
-    console.log('[services.ts] GitHubカスタムパラメータを設定しました');
-    
-    // GitHubプロバイダーの設定 - より詳細に
+    // ポップアップ認証を試みる
     try {
-      // まずポップアップで試みる
-      console.log('[services.ts] ポップアップ認証を開始します...');
-      try {
-        const result = await auth.signInWithPopup(githubProvider);
-        console.log('[services.ts] ポップアップ認証成功:', result.user?.uid);
-        console.log('[services.ts] 認証結果の詳細:', {
-          hasCredential: !!result.credential,
-          hasUser: !!result.user,
-          provider: result.additionalUserInfo?.providerId,
-          isNewUser: result.additionalUserInfo?.isNewUser
-        });
-        
-        if (result.user) {
-          // Firestoreへの保存を試みる前に権限エラーをキャッチできるようにする
-          try {
-            await saveUserToFirestore(result.user);
-            console.log('[services.ts] ユーザー情報をFirestoreに保存しました');
-          } catch (firestoreError) {
-            console.error('[services.ts] Firestoreへの保存エラー:', firestoreError);
-            // エラーが発生してもトークンの保存は続行
-          }
-          
-          // GitHubアクセストークンを保存
-          if (result.credential) {
-            const credential = result.credential as any;
-            const token = credential.accessToken;
-            
-            if (token) {
-              localStorage.setItem('github_token', token);
-              console.log('[services.ts] GitHubトークン保存成功:', token.substring(0, 8) + '...');
-            } else {
-              console.error('[services.ts] トークンが存在しません');
-            }
-          } else {
-            console.error('[services.ts] credential情報が存在しません');
-          }
-        }
-        
-        return { success: true, user: result.user };
-      } catch (popupError) {
-        console.error('[services.ts] ポップアップ認証失敗:', popupError);
-        
-        // ポップアップがブロックされたか閉じられた場合はリダイレクト認証にフォールバック
-        if (popupError && typeof popupError === 'object' && 'code' in popupError) {
-          const code = (popupError as any).code;
-          console.error('[services.ts] ポップアップエラーコード:', code);
-          
-          if (code === 'auth/popup-blocked' || code === 'auth/popup-closed-by-user') {
-            console.log('[services.ts] ポップアップ失敗のためリダイレクト認証に切り替えます...');
-            // セッションストレージにリダイレクトフラグを設定
-            sessionStorage.setItem('auth_redirect_attempted', 'true');
-            // リダイレクト認証を実行
-            await auth.signInWithRedirect(githubProvider);
-            return { success: true, message: 'リダイレクト認証を開始しました' };
-          } else if (code === 'auth/network-request-failed') {
-            // ネットワークエラー時の詳細情報を取得
-            const errorDetails = await getNetworkErrorDetails();
-            return { 
-              success: false, 
-              error: popupError,
-              errorDetails
-            };
-          }
-        }
-        
-        // その他のエラーの場合はそのまま返す
-        return { success: false, error: popupError };
+      console.log('ポップアップでGitHub認証を試みます...');
+      const result = await auth.signInWithPopup(provider);
+      
+      // 認証結果からGitHubのトークンを取得
+      const credential = result.credential;
+      const token = credential ? (credential as any).accessToken : null;
+      
+      if (token) {
+        console.log('GitHub認証成功: アクセストークンを保存します');
+        localStorage.setItem('github_token', token);
+        localStorage.setItem('last_github_login', new Date().toISOString());
+      } else {
+        console.error('GitHub認証は成功しましたが、トークンが取得できませんでした');
       }
-    } catch (error) {
-      console.error('[services.ts] 認証全体のエラー:', error);
-      return { success: false, error };
+      
+      return {
+        success: true,
+        user: result.user,
+        githubToken: token
+      };
+    } catch (error: any) {
+      console.error('ポップアップでのGitHub認証に失敗:', error);
+      
+      // エラーコードに基づいて処理
+      if (error.code === 'auth/popup-blocked') {
+        console.log('ポップアップがブロックされました。リダイレクト認証に切り替えます...');
+        
+        try {
+          // リダイレクト認証に切り替え
+          await auth.signInWithRedirect(provider);
+          return {
+            success: true,
+            message: 'GitHubログインページにリダイレクトしています。認証後に自動的に戻ります。'
+          };
+        } catch (redirectError) {
+          console.error('リダイレクト認証の設定に失敗:', redirectError);
+          return {
+            success: false,
+            error: redirectError,
+            message: 'GitHubログインページへのリダイレクトに失敗しました。'
+          };
+        }
+      } else if (error.code === 'auth/account-exists-with-different-credential') {
+        // 同じメールアドレスが別の認証方法で既に使用されている場合の処理
+        console.log('アカウントが別の認証方法で既に存在します。', error);
+        
+        try {
+          // エラーからメールアドレスを取得
+          const email = error.customData?.email;
+          if (!email) {
+            throw new Error('アカウント連携に必要なメールアドレスが取得できませんでした。');
+          }
+          
+          // このメールアドレスに関連付けられた認証方法を確認
+          const methods = await auth.fetchSignInMethodsForEmail(email);
+          console.log(`メール「${email}」の既存の認証方法:`, methods);
+          
+          return {
+            success: false,
+            error: error,
+            message: `このGitHubアカウントのメールアドレス(${email})は既に別の認証方法(${methods.join(', ')})で登録されています。現在のアカウントにGitHubを連携するには、まず既存の方法でログインしてください。`,
+            email: email,
+            methods: methods
+          };
+        } catch (fetchError) {
+          console.error('認証方法の取得中にエラー:', fetchError);
+          return {
+            success: false,
+            error: fetchError,
+            message: '認証に関する情報が取得できませんでした。別の認証方法をお試しください。'
+          };
+        }
+      }
+      
+      // その他のエラー
+      return {
+        success: false,
+        error: error
+      };
     }
   } catch (error) {
-    console.error('[services.ts] GitHub認証エラー:', error);
-    
-    // より詳細なエラー情報をログに出力
-    if (error instanceof Error) {
-      console.error('[services.ts] エラーの詳細:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
-    }
-    
-    return { success: false, error: error instanceof Error ? error.message : '認証エラーが発生しました' };
+    console.error('GitHub認証中に予期せぬエラーが発生:', error);
+    return {
+      success: false,
+      error: error,
+      message: '予期せぬエラーが発生しました'
+    };
   }
 };
 
@@ -582,5 +614,54 @@ export const handleRedirectResult = async () => {
     }
     
     return { success: false, error };
+  }
+};
+
+// アカウントリンク用のヘルパー関数 - 既存アカウントに新しい認証方法を追加
+export const linkAccountWithProvider = async (provider: firebase.auth.AuthProvider) => {
+  try {
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      return { 
+        success: false, 
+        error: 'ユーザーがログインしていません。先にログインしてください。' 
+      };
+    }
+    
+    console.log(`[services.ts] アカウント(${currentUser.email})にプロバイダーをリンクします...`);
+    const result = await currentUser.linkWithPopup(provider);
+    
+    console.log('[services.ts] アカウントリンク成功:', result);
+    return { success: true, user: currentUser, credential: result.credential };
+  } catch (error) {
+    console.error('[services.ts] アカウントリンクエラー:', error);
+    
+    let errorMessage = 'アカウントのリンクに失敗しました。';
+    let errorType = 'unknown';
+    
+    if (error && typeof error === 'object' && 'code' in error) {
+      const code = (error as any).code;
+      
+      if (code === 'auth/credential-already-in-use') {
+        errorType = 'credential-already-in-use';
+        errorMessage = 'この認証情報は既に別のアカウントで使用されています。';
+      } else if (code === 'auth/email-already-in-use') {
+        errorType = 'email-already-in-use';
+        errorMessage = 'このメールアドレスは既に使用されています。';
+      } else if (code === 'auth/provider-already-linked') {
+        errorType = 'provider-already-linked';
+        errorMessage = 'このプロバイダーは既にアカウントにリンクされています。';
+      } else if (code === 'auth/operation-not-allowed') {
+        errorType = 'operation-not-allowed';
+        errorMessage = 'この操作は許可されていません。';
+      }
+    }
+    
+    return { 
+      success: false, 
+      error, 
+      errorType,
+      message: errorMessage
+    };
   }
 }; 

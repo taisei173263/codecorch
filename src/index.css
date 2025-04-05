@@ -10,31 +10,40 @@ body {
 }
 
 /* Remove outline for all clickable elements */
-@layer base {
-  a:focus,
-  button:focus {
-    @apply outline-none ring-2 ring-blue-500 ring-opacity-50;
-  }
+a:focus,
+button:focus {
+  outline: none;
+}
 
-  /* Smooth transitions for dark mode */
-  .dark body {
-    @apply transition-colors duration-200;
-  }
+/* Smooth transitions for dark mode */
+.dark body {
+  transition-property: color, background-color;
+  transition-duration: 200ms;
+}
 
-  /* Custom scrollbar */
-  ::-webkit-scrollbar {
-    width: 8px;
-  }
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
 
-  ::-webkit-scrollbar-track {
-    @apply bg-gray-100 dark:bg-gray-800;
-  }
+::-webkit-scrollbar-track {
+  background-color: #f3f4f6;
+}
+.dark ::-webkit-scrollbar-track {
+  background-color: #1f2937;
+}
 
-  ::-webkit-scrollbar-thumb {
-    @apply bg-gray-300 dark:bg-gray-600 rounded-full;
-  }
+::-webkit-scrollbar-thumb {
+  background-color: #d1d5db;
+  border-radius: 9999px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background-color: #4b5563;
+}
 
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-gray-400 dark:bg-gray-500;
-  }
+::-webkit-scrollbar-thumb:hover {
+  background-color: #9ca3af;
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background-color: #6b7280;
 } 

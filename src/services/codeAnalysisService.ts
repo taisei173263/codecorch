@@ -144,7 +144,7 @@ const loadModel = async () => {
 /**
  * リポジトリのコード分析を実行
  */
-export const analyzeRepository = async (fullRepoName: string): Promise<RepositoryAnalysisResult> => {
+export const analyzeRepository = async (fullRepoName: string, targetFilePath?: string): Promise<RepositoryAnalysisResult> => {
   // リポジトリ名からオーナーとリポジトリ名を分離
   const [owner, repo] = fullRepoName.split('/');
   
@@ -163,24 +163,39 @@ export const analyzeRepository = async (fullRepoName: string): Promise<Repositor
     languageBreakdown[lang] = Math.round(((bytes as number) / totalBytes) * 100);
   }
   
-  // ファイルを収集
-  const rootContents = await getRepositoryContents(owner, repo);
-  const filePaths = await collectFiles(owner, repo, rootContents);
-  
-  // 分析するファイルの最大数を制限（大きなリポジトリのパフォーマンス対策）
-  const MAX_FILES_TO_ANALYZE = 10;
-  const filesToAnalyze = filePaths.slice(0, MAX_FILES_TO_ANALYZE);
-  
   // 各ファイルを分析
   const fileResults: FileAnalysisResult[] = [];
-  for (const file of filesToAnalyze) {
+  
+  if (targetFilePath) {
+    // 特定のファイルを分析する場合
     try {
-      const result = await analyzeFile(owner, repo, file.path, file.name);
+      const fileName = targetFilePath.split('/').pop() || targetFilePath;
+      const result = await analyzeFile(owner, repo, targetFilePath, fileName);
       if (result) {
         fileResults.push(result);
       }
     } catch (error) {
-      console.error(`Failed to analyze file ${file.path}:`, error);
+      console.error(`Failed to analyze file ${targetFilePath}:`, error);
+    }
+  } else {
+    // 従来のようにリポジトリから複数ファイルを分析する場合
+    // ファイルを収集
+    const rootContents = await getRepositoryContents(owner, repo);
+    const filePaths = await collectFiles(owner, repo, rootContents);
+    
+    // 分析するファイルの最大数を制限（大きなリポジトリのパフォーマンス対策）
+    const MAX_FILES_TO_ANALYZE = 10;
+    const filesToAnalyze = filePaths.slice(0, MAX_FILES_TO_ANALYZE);
+    
+    for (const file of filesToAnalyze) {
+      try {
+        const result = await analyzeFile(owner, repo, file.path, file.name);
+        if (result) {
+          fileResults.push(result);
+        }
+      } catch (error) {
+        console.error(`Failed to analyze file ${file.path}:`, error);
+      }
     }
   }
   
@@ -800,7 +815,20 @@ export const getScoreExplanation = (scoreType: string, score: number, language: 
   }
 };
 
+/**
+ * 特定の単一ファイルを分析する
+ */
+export const analyzeSingleFile = async (
+  fullRepoName: string,
+  filePath: string
+): Promise<FileAnalysisResult | null> => {
+  const [owner, repo] = fullRepoName.split('/');
+  const fileName = filePath.split('/').pop() || filePath;
+  return await analyzeFile(owner, repo, filePath, fileName);
+};
+
 export default {
   analyzeRepository,
+  analyzeSingleFile,
   loadModel
 };

@@ -43,7 +43,7 @@ const isLocalhost = window.location.hostname === 'localhost' || window.location.
 // 環境変数から設定を取得
 // 注: 実際にはindex.htmlで<script>タグを使って環境変数を注入する必要があります
 const firebaseConfig = window.ENV_CONFIG?.FIREBASE || {
-  apiKey: "",
+  apiKey: "AIzaSyB-hTYnbPzKioEN02HBqGPnS04NqvJXryY",
   authDomain: "codecoach-61d26.firebaseapp.com",
   projectId: "codecoach-61d26",
   storageBucket: "codecoach-61d26.appspot.com",

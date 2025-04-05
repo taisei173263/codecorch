@@ -11,7 +11,7 @@ import SkillsAndLearningView from './SkillsAndLearningView';
 import HowToUseGuide from './HowToUseGuide';
 import CodeImprovementView from './CodeImprovementView';
 import { Skill } from '../services/learningPathService';
-import { getUserRepositories, Repository, getRepositoryContents, getFileContent } from '../services/githubService';
+import { getUserRepositories, Repository, getRepositoryContents } from '../services/githubService';
 import { analyzeRepository, RepositoryAnalysisResult, FileAnalysisResult, CodeIssue, SUPPORTED_EXTENSIONS } from '../services/codeAnalysisService';
 import { generateLearningPath } from '../services/learningPathService';
 import { generateCodeImprovements, prepareImprovementUIData } from '../services/codeImprovementService';
@@ -153,21 +153,17 @@ export const Dashboard: React.FC<DashboardProps> = ({
       setRecommendedSkills(skills);
       
       // 分析結果を取得した後、改善提案を生成
-      if (results && results.files && results.files.length > 0 && filePath) {
+      if (results && results.files && results.files.length > 0) {
         try {
-          // 先にreadFileContent関数を呼び出してから改善提案を生成
           const fileContent = await readFileContent(filePath);
-          if (fileContent && results.files[0].issues) {
-            const improvements = await generateCodeImprovements(
-              fileContent,
-              results.files[0].language,
-              results.files[0].issues
-            );
-            setCodeImprovements(improvements);
-          }
+          const improvements = await generateCodeImprovements(
+            fileContent,
+            results.files[0].language,
+            results.files[0].issues
+          );
+          setCodeImprovements(improvements);
         } catch (error) {
           console.error('改善提案の生成中にエラーが発生しました:', error);
-          setCodeImprovements([]);
         }
       } else {
         setCodeImprovements([]);
@@ -206,19 +202,6 @@ export const Dashboard: React.FC<DashboardProps> = ({
   // 使い方ガイドの表示/非表示を切り替え
   const toggleHowToUseGuide = () => {
     setShowHowToUseGuide(!showHowToUseGuide);
-  };
-
-  // ファイルの内容を読み取る関数を追加
-  const readFileContent = async (path?: string): Promise<string> => {
-    if (!path || !selectedRepository) return '';
-    
-    try {
-      const [owner, repo] = selectedRepository.full_name.split('/');
-      return await getFileContent(owner, repo, path);
-    } catch (error) {
-      console.error('ファイル内容の読み取りに失敗しました:', error);
-      return '';
-    }
   };
 
   // ダッシュボードのヘッダーを追加
@@ -516,28 +499,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
                   </div>
                 </div>
               ) : analysisResults ? (
-                <div className="space-y-6">
-                  {/* コード分析結果 */}
-                  <div>
-                    {analysisResults.files.map((fileResult, index) => (
-                      <CodeAnalysisView 
-                        key={index} 
-                        analysisResult={fileResult}
-                        fileName={fileResult.fileName}
-                      />
-                    ))}
-                  </div>
-                  
-                  {/* コード改善提案 */}
-                  {codeImprovements && codeImprovements.length > 0 && (
-                    <div>
-                      <CodeImprovementView
-                        improvements={codeImprovements}
-                        fileName={selectedFilePath ?? ''}
-                      />
-                    </div>
-                  )}
-                </div>
+                analysisResults.files.map((fileResult, index) => (
+                  <CodeAnalysisView 
+                    key={index} 
+                    analysisResult={fileResult}
+                    fileName={fileResult.fileName}
+                  />
+                ))
               ) : (
                 <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-8 text-center">
                   <div className="flex items-center justify-center text-yellow-500 mb-4">
@@ -557,6 +525,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
                       </button>
                     </div>
                   )}
+                </div>
+              )}
+
+              {analysisResults && analysisResults.issues && analysisResults.issues.length > 0 && (
+                <div className="mt-6">
+                  <CodeImprovementView
+                    improvements={codeImprovements}
+                    fileName={selectedFilePath}
+                  />
                 </div>
               )}
             </div>
