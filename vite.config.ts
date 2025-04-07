@@ -61,7 +61,11 @@ export default defineConfig({
   resolve: {
     alias: [
       { find: 'process', replacement: 'process/browser' },
-      { find: 'util', replacement: 'util/' }
+      { find: 'util', replacement: 'util/' },
+      {
+        find: '#minpath',
+        replacement: 'minpath'
+      }
     ]
   },
   build: {
@@ -73,11 +77,24 @@ export default defineConfig({
     assetsDir: 'assets',
     rollupOptions: {
       output: {
-        manualChunks: undefined,
-        entryFileNames: 'assets/[name].[hash].js',
+        manualChunks: (id) => {
+          if (id.includes('node_modules')) {
+            if (id.includes('react') || id.includes('react-dom')) {
+              return 'vendor-react';
+            }
+            if (id.includes('firebase')) {
+              return 'vendor-firebase';
+            }
+            if (id.includes('markdown') || id.includes('remark')) {
+              return 'vendor-markdown';
+            }
+            return 'vendor'; // その他のnode_modules
+          }
+        },
         chunkFileNames: 'assets/[name].[hash].js',
         assetFileNames: 'assets/[name].[hash].[ext]'
-      }
+      },
+      external: ['#minpath', '#minproc', '#minurl']
     }
   },
   optimizeDeps: {

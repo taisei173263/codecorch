@@ -281,8 +281,8 @@ export const generateCodeImprovements = async (
 ): Promise<CodeImprovement[]> => {
   try {
     const lines = code.split('\n');
-    const improvements: CodeImprovement[] = [];
-    
+  const improvements: CodeImprovement[] = [];
+  
     // IDが未設定の問題にIDを割り当て
     const issuesWithIds = issues.map((issue, index) => ({
       ...issue,
@@ -384,7 +384,7 @@ export const generateCodeImprovements = async (
       );
       
       // 改善提案を追加
-      improvements.push({
+    improvements.push({
         originalIssue: issueWithContext,
         suggestion: improvement.suggestion,
         improvedCode: improvement.improvedCode,
@@ -396,10 +396,10 @@ export const generateCodeImprovements = async (
         additionalResources,
         potentialRisks,
         isExpanded: false // デフォルトは折りたたみ状態
-      });
-    }
-    
-    return improvements;
+    });
+  }
+  
+  return improvements;
   } catch (error) {
     console.error('コード改善提案の生成中にエラーが発生しました:', error);
     return [];
@@ -709,7 +709,7 @@ const generateImplementationSteps = (
   const customSteps: string[] = [];
   
   if (issue.type === 'style') {
-    if (language === 'javascript' || language === 'typescript') {
+  if (language === 'javascript' || language === 'typescript') {
       customSteps.push('ESLintとPrettierを設定してコードスタイルを自動的に強制する');
     } else if (language === 'python') {
       customSteps.push('Blackフォーマッターを使用して一貫したスタイルを適用する');

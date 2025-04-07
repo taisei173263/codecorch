@@ -7,14 +7,132 @@ declare global {
     _FIREBASE_AUTH: any;
     _FIREBASE_FIRESTORE: any;
     _FIREBASE_DATABASE: any;
+    firebase?: any; // グローバルfirebaseへの参照も許可
   }
 }
 
-// グローバル変数からFirebaseインスタンスを取得
-const firebase = window._FIREBASE;
-const auth = window._FIREBASE_AUTH;
-const db = window._FIREBASE_FIRESTORE;
-const rtdb = window._FIREBASE_DATABASE;
+// Firebaseインスタンスを初期化/取得する関数
+const getFirebaseInstance = () => {
+  if (!window._FIREBASE) {
+    console.log('Firebase instance not found in window._FIREBASE, trying alternatives');
+    // Firebase SDKがロードされているがwindowにセットされていない場合の対応
+    if (typeof firebase !== 'undefined') {
+      console.log('Using global firebase variable as fallback');
+      return firebase;
+    } else if (typeof window.firebase !== 'undefined') {
+      console.log('Using window.firebase variable as fallback');
+      return window.firebase;
+    }
+    console.error('No Firebase instance available');
+    return null;
+  }
+  return window._FIREBASE;
+};
+
+// Firebaseサービスを取得
+const firebase = getFirebaseInstance();
+console.log('Firebase instance obtained:', !!firebase);
+
+// 認証サービスの初期化
+let auth: any = null;
+const initAuth = () => {
+  if (auth) return auth; // 既に初期化されている場合
+
+  try {
+    // 優先度順に認証を取得
+    if (window._FIREBASE_AUTH) {
+      auth = window._FIREBASE_AUTH;
+      console.log('Using window._FIREBASE_AUTH');
+    } else if (firebase && typeof firebase.auth === 'function') {
+      auth = firebase.auth();
+      console.log('Using firebase.auth()');
+      // グローバル変数にも設定
+      window._FIREBASE_AUTH = auth;
+    } else if (window.firebase && typeof window.firebase.auth === 'function') {
+      auth = window.firebase.auth();
+      console.log('Using window.firebase.auth()');
+      // グローバル変数にも設定
+      window._FIREBASE_AUTH = auth;
+    } else {
+      console.error('No Firebase auth available after all attempts');
+      return null;
+    }
+    
+    return auth;
+  } catch (error) {
+    console.error('Failed to initialize auth in initAuth():', error);
+    return null;
+  }
+};
+
+// Firestoreの初期化
+let db: any = null;
+const initFirestore = () => {
+  if (db) return db; // 既に初期化されている場合
+
+  try {
+    // 優先度順にFirestoreを取得
+    if (window._FIREBASE_FIRESTORE) {
+      db = window._FIREBASE_FIRESTORE;
+      console.log('Using window._FIREBASE_FIRESTORE');
+    } else if (firebase && typeof firebase.firestore === 'function') {
+      db = firebase.firestore();
+      console.log('Using firebase.firestore()');
+      // グローバル変数にも設定
+      window._FIREBASE_FIRESTORE = db;
+    } else if (window.firebase && typeof window.firebase.firestore === 'function') {
+      db = window.firebase.firestore();
+      console.log('Using window.firebase.firestore()');
+      // グローバル変数にも設定
+      window._FIREBASE_FIRESTORE = db;
+    } else {
+      console.error('No Firebase firestore available after all attempts');
+      return null;
+    }
+    
+    return db;
+  } catch (error) {
+    console.error('Failed to initialize firestore in initFirestore():', error);
+    return null;
+  }
+};
+
+// Realtime Databaseの初期化
+let rtdb: any = null;
+const initDatabase = () => {
+  if (rtdb) return rtdb; // 既に初期化されている場合
+
+  try {
+    // 優先度順にDatabaseを取得
+    if (window._FIREBASE_DATABASE) {
+      rtdb = window._FIREBASE_DATABASE;
+      console.log('Using window._FIREBASE_DATABASE');
+    } else if (firebase && typeof firebase.database === 'function') {
+      rtdb = firebase.database();
+      console.log('Using firebase.database()');
+      // グローバル変数にも設定
+      window._FIREBASE_DATABASE = rtdb;
+    } else if (window.firebase && typeof window.firebase.database === 'function') {
+      rtdb = window.firebase.database();
+      console.log('Using window.firebase.database()');
+      // グローバル変数にも設定
+      window._FIREBASE_DATABASE = rtdb;
+    } else {
+      console.error('No Firebase database available after all attempts');
+      return null;
+    }
+    
+    return rtdb;
+  } catch (error) {
+    console.error('Failed to initialize database in initDatabase():', error);
+    return null;
+  }
+};
+
+// 初期化の実行
+auth = initAuth();
+db = initFirestore();
+rtdb = initDatabase();
 
 // 開発環境の場合、Firebase Emulatorに接続
 if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_USE_EMULATOR === 'true') {
@@ -48,19 +166,45 @@ if (process.env.NODE_ENV === 'development' && process.env.REACT_APP_USE_EMULATOR
   console.log('Firebase Emulators enabled for development');
 }
 
-console.log('Firebase services.ts loaded, firebase instance:', !!firebase);
+console.log('Firebase services.ts loaded, firebase instance:', !!firebase, 'auth:', !!auth, 'firestore:', !!db);
+
+// 安全なFirebaseサービスの使用のためのヘルパー関数
+const safeFirebaseOp = async <T>(
+  operation: () => Promise<T>,
+  serviceName: string,
+  fallback: T
+): Promise<T> => {
+  try {
+    return await operation();
+  } catch (error) {
+    console.error(`Firebase ${serviceName} operation failed:`, error);
+    return fallback;
+  }
+};
+
+// 安全に認証状態を取得
+export const getCurrentUser = () => {
+  try {
+    const currentAuth = initAuth();
+    return currentAuth?.currentUser || null;
+  } catch (error) {
+    console.error('Failed to get current user:', error);
+    return null;
+  }
+};
 
 // Firebaseサービスをエクスポート
 export { firebase, auth, db, rtdb };
 
 // ユーザープロファイルをFirestoreに保存
 export const saveUserToFirestore = async (user: any) => {
-  if (!user?.uid || !db) {
+  const firestore = initFirestore();
+  if (!user?.uid || !firestore) {
     console.error('Cannot save user to Firestore. User or DB not available.');
     return;
   }
 
-  const userRef = db.collection('users').doc(user.uid);
+  const userRef = firestore.collection('users').doc(user.uid);
   try {
     const docSnap = await userRef.get();
 
@@ -81,12 +225,22 @@ export const saveUserToFirestore = async (user: any) => {
   }
 };
 
-// 認証状態の監視
+// 安全なユーザー認証状態の監視
 export const subscribeToAuthChanges = (callback: (user: any | null) => void) => {
-  return auth.onAuthStateChanged(async (user: any) => {
+  try {
+    const currentAuth = initAuth();
+    if (!currentAuth) {
+      console.error('Auth not available, cannot subscribe to auth changes');
+      callback(null);
+      return () => {}; // Noop unsubscribe function
+    }
+    
+    return currentAuth.onAuthStateChanged(async (user: any) => {
     if (user) {
+        const firestore = initFirestore();
+        if (firestore) {
       try {
-        const userRef = db.collection('users').doc(user.uid);
+            const userRef = firestore.collection('users').doc(user.uid);
         const docSnap = await userRef.get();
         
         if (docSnap.exists) {
@@ -96,10 +250,16 @@ export const subscribeToAuthChanges = (callback: (user: any | null) => void) => 
         }
       } catch (error) {
         console.error('Error getting user 2FA settings:', error);
+          }
       }
     }
     callback(user);
   });
+  } catch (error) {
+    console.error('Failed to subscribe to auth changes:', error);
+    callback(null);
+    return () => {}; // Noop unsubscribe function
+  }
 };
 
 // ユーザープロファイルの更新
@@ -112,8 +272,13 @@ export const updateUserProfile = async (
     displayName?: string;
   }
 ) => {
+  const firestore = initFirestore();
+  if (!firestore) {
+    return { success: false, error: 'Firestore not available' };
+  }
+
   try {
-    const userRef = db.collection('users').doc(uid);
+    const userRef = firestore.collection('users').doc(uid);
     await userRef.update({ 
       ...data, 
       updatedAt: firebase.firestore.FieldValue.serverTimestamp() 
@@ -203,124 +368,106 @@ interface AuthResult {
   errorDetails?: any;
 }
 
-// GitHub OAuth認証
+// GitHub OAuth認証（改善版）
 export const signInWithGithub = async (): Promise<AuthResult> => {
-  console.log('GitHub認証を開始します');
-  
   try {
-    // ネットワーク接続の確認
-    if (!navigator.onLine) {
-      console.error('ネットワーク接続がありません');
-      return { 
-        success: false, 
-        error: new Error('インターネット接続がありません。ネットワーク設定を確認してください。'),
-        message: 'インターネット接続がありません'
-      };
+    // 認証の初期化状態を確認
+    if (!auth && window._FIREBASE_AUTH) {
+      console.log('Using window._FIREBASE_AUTH as fallback in signInWithGithub');
+      auth = window._FIREBASE_AUTH;
     }
 
-    // 認証プロバイダ設定
-    const GithubAuthProvider = firebase.auth.GithubAuthProvider;
-    const provider = new GithubAuthProvider();
-    provider.addScope('repo');
+    // firebase instance再確認
+    let firebaseInstance = firebase;
+    if (!firebaseInstance) {
+      if (window._FIREBASE) {
+        console.log('Using window._FIREBASE as fallback in signInWithGithub');
+        firebaseInstance = window._FIREBASE;
+      } else if (typeof window.firebase !== 'undefined') {
+        console.log('Using window.firebase as fallback in signInWithGithub');
+        firebaseInstance = window.firebase;
+      }
+    }
     
-    // 明示的にリダイレクトURLを設定
-    const netlifyURL = 'https://codecoach2025.netlify.app/';
+    if (!auth || !firebaseInstance) {
+      console.error('Firebase auth or firebase instance not available for GitHub auth');
+      return { success: false, error: 'Firebase auth not available' };
+    }
+    
+    console.log('GitHub auth starting with:', { authExists: !!auth, firebaseExists: !!firebaseInstance });
+    
+    // GitHub認証プロバイダの設定
+    const provider = new firebaseInstance.auth.GithubAuthProvider();
+    provider.addScope('repo');
     provider.setCustomParameters({
-      redirect_uri: netlifyURL
+      allow_signup: 'true'
     });
     
-    // ログインの状態をコンソールに出力
-    const beforeAuth = await auth.currentUser;
-    console.log('認証前のユーザー状態:', beforeAuth ? 'ログイン中' : '未ログイン');
+    console.log('GitHub provider created, attempting sign in with popup');
     
-    // ポップアップ認証を試みる
-    try {
-      console.log('ポップアップでGitHub認証を試みます...');
+    // GitHub認証を実行
       const result = await auth.signInWithPopup(provider);
       
-      // 認証結果からGitHubのトークンを取得
-      const credential = result.credential;
-      const token = credential ? (credential as any).accessToken : null;
-            
-            if (token) {
-        console.log('GitHub認証成功: アクセストークンを保存します');
-              localStorage.setItem('github_token', token);
-        localStorage.setItem('last_github_login', new Date().toISOString());
+    // ユーザー情報を取得
+    const user = result.user;
+    if (!user) {
+      return { success: false, error: 'User information not available after authentication' };
+    }
+    
+    // GitHubトークンを取得
+    const credential = result.credential as any;
+    const githubToken = credential?.accessToken;
+    
+    // Firestoreにユーザー情報を保存
+    if (db) {
+      await saveUserToFirestore(user);
       } else {
-        console.error('GitHub認証は成功しましたが、トークンが取得できませんでした');
+      console.warn('Firestore not available, user data not saved');
       }
       
       return {
         success: true,
-        user: result.user,
-        githubToken: token
+      user,
+      githubToken
       };
     } catch (error: any) {
-      console.error('ポップアップでのGitHub認証に失敗:', error);
-      
-      // エラーコードに基づいて処理
-      if (error.code === 'auth/popup-blocked') {
-        console.log('ポップアップがブロックされました。リダイレクト認証に切り替えます...');
-        
-        try {
-          // リダイレクト認証に切り替え
-          await auth.signInWithRedirect(provider);
-              return { 
-            success: true,
-            message: 'GitHubログインページにリダイレクトしています。認証後に自動的に戻ります。'
-          };
-        } catch (redirectError) {
-          console.error('リダイレクト認証の設定に失敗:', redirectError);
-              return {
-                success: false,
-            error: redirectError,
-            message: 'GitHubログインページへのリダイレクトに失敗しました。'
-          };
-        }
-      } else if (error.code === 'auth/account-exists-with-different-credential') {
-        // 同じメールアドレスが別の認証方法で既に使用されている場合の処理
-        console.log('アカウントが別の認証方法で既に存在します。', error);
-        
-        try {
-          // エラーからメールアドレスを取得
-          const email = error.customData?.email;
-          if (!email) {
-            throw new Error('アカウント連携に必要なメールアドレスが取得できませんでした。');
-          }
-          
-          // このメールアドレスに関連付けられた認証方法を確認
-          const methods = await auth.fetchSignInMethodsForEmail(email);
-          console.log(`メール「${email}」の既存の認証方法:`, methods);
-          
+    console.error('GitHub認証中に予期せぬエラーが発生:', error);
+    
+    // エラー詳細をログ
+    console.log('GitHub認証エラー詳細:', {
+      code: error.code,
+      message: error.message,
+      email: error.email,
+      credential: error.credential,
+      stack: error.stack
+    });
+    
+    // エラー処理
+    if (error.code === 'auth/account-exists-with-different-credential') {
+      // 別の認証方法で登録済みの場合のエラー処理
+      try {
+        if (auth && error.email) {
+          const methods = await auth.fetchSignInMethodsForEmail(error.email);
           return {
             success: false,
             error: error,
-            message: `このGitHubアカウントのメールアドレス(${email})は既に別の認証方法(${methods.join(', ')})で登録されています。現在のアカウントにGitHubを連携するには、まず既存の方法でログインしてください。`,
-            email: email,
-            methods: methods
-          };
-        } catch (fetchError) {
-          console.error('認証方法の取得中にエラー:', fetchError);
-            return { 
-              success: false, 
-            error: fetchError,
-            message: '認証に関する情報が取得できませんでした。別の認証方法をお試しください。'
+            message: `このメールアドレスは既に別の方法で登録されています。次の方法をお試しください: ${methods.join(', ')}`,
+            email: error.email
           };
         }
+        } catch (fetchError) {
+            return { 
+              success: false, 
+          error: error,
+          message: 'このメールアドレスは既に別の方法で登録されています。'
+        };
       }
-      
-      // その他のエラー
-      return {
-        success: false,
-        error: error
-      };
     }
-  } catch (error) {
-    console.error('GitHub認証中に予期せぬエラーが発生:', error);
+    
     return {
       success: false,
       error: error,
-      message: '予期せぬエラーが発生しました'
+      message: error.message || 'GitHub認証中にエラーが発生しました'
     };
   }
 };

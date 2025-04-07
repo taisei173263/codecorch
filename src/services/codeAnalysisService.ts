@@ -82,6 +82,7 @@ export interface FileAnalysisResult {
     complexity: string;
     bestPractices: string;
   };
+  codeContent?: string; // AIツール用にコード内容を保存
 }
 
 // リポジトリ分析結果型定義
@@ -1439,7 +1440,8 @@ export const analyzeCode = async (code: string, language: string): Promise<FileA
           bestPracticesScore: transformerResults.bestPracticesScore,
           maxNestingDepth,
           issues: [...issues, ...additionalIssues],
-          scoreExplanations
+          scoreExplanations,
+          codeContent: code // AI機能用にコード内容を保存
         };
       }
     } catch (error) {
@@ -1479,7 +1481,8 @@ export const analyzeCode = async (code: string, language: string): Promise<FileA
       bestPracticesScore,
       maxNestingDepth,
       issues,
-      scoreExplanations
+      scoreExplanations,
+      codeContent: code // AI機能用にコード内容を保存
     };
   } catch (error) {
     console.error('コード分析エラー:', error);
@@ -1494,4 +1497,4 @@ export default {
   analyzeCode,
   SUPPORTED_EXTENSIONS,
   SUPPORTED_LANGUAGES
-}; 
+};

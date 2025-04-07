@@ -289,9 +289,9 @@ const findSimilarDuplicates = async (
       
       // 既に正確な重複として検出されていれば比較しない
       if (blockA.hash === blockB.hash) {
-        continue;
-      }
-      
+      continue;
+    }
+    
       // 重複範囲が重なる場合は比較しない
       if (
         (blockB.startLine >= blockA.startLine && blockB.startLine <= blockA.endLine) ||

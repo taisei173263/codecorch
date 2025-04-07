@@ -65,7 +65,7 @@ export interface SecurityCheckResult {
 const VULNERABILITY_PATTERNS: {
   [key: string]: {
     [key in VulnerabilityType]?: {
-      pattern: RegExp;
+  pattern: RegExp;
       severity: Severity;
       message: string;
       cwe?: string;
@@ -77,8 +77,8 @@ const VULNERABILITY_PATTERNS: {
 } = {
   javascript: {
     [VulnerabilityType.INJECTION]: [
-      {
-        pattern: /eval\s*\(/g,
+  {
+    pattern: /eval\s*\(/g,
         severity: Severity.HIGH,
         message: 'eval()の使用は非常に危険です。任意のコードが実行される可能性があります。',
         cwe: 'CWE-95',
@@ -104,9 +104,9 @@ const VULNERABILITY_PATTERNS: {
         recommendation: 'innerHTMLの代わりにtextContentを使用するか、DOMPurifyなどのライブラリでサニタイズしてください。',
         exampleFix: "// 危険なコード:\nelement.innerHTML = userInput;\n\n// 安全なコード:\nelement.textContent = userInput;\n// または\nimport DOMPurify from 'dompurify';\nelement.innerHTML = DOMPurify.sanitize(userInput);",
         references: ['https://owasp.org/www-community/attacks/xss/']
-      },
-      {
-        pattern: /document\.write\s*\(/g,
+  },
+  {
+    pattern: /document\.write\s*\(/g,
         severity: Severity.MEDIUM,
         message: 'document.writeはXSS攻撃に弱いため、使用は避けるべきです。',
         cwe: 'CWE-79',

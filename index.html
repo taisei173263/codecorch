@@ -44,17 +44,17 @@
     
     <!-- 環境変数の注入 - Viteによって処理される -->
     <script>
-      // Firebase設定を環境変数から注入
+      // Firebase設定を直接設定
       window.ENV_CONFIG = {
         FIREBASE: {
-          apiKey: "%VITE_FIREBASE_API_KEY%",
-          authDomain: "%VITE_FIREBASE_AUTH_DOMAIN%",
-          projectId: "%VITE_FIREBASE_PROJECT_ID%",
-          storageBucket: "%VITE_FIREBASE_STORAGE_BUCKET%",
-          messagingSenderId: "%VITE_FIREBASE_MESSAGING_SENDER_ID%",
-          appId: "%VITE_FIREBASE_APP_ID%",
-          measurementId: "%VITE_FIREBASE_MEASUREMENT_ID%",
-          databaseURL: "%VITE_FIREBASE_DATABASE_URL%"
+          apiKey: "AIzaSyB-hTYnbPzKioEN02HBqGPnS04NqvJXryY",
+          authDomain: "codecoach-61d26.firebaseapp.com",
+          projectId: "codecoach-61d26",
+          storageBucket: "codecoach-61d26.appspot.com",
+          messagingSenderId: "313757336409",
+          appId: "1:313757336409:web:b73f3d69835f848975c248",
+          measurementId: "G-DCBS6YVDZK",
+          databaseURL: "https://codecoach-61d26.firebaseio.com"
         }
       };
       console.log('Environment config initialized:', !!window.ENV_CONFIG);
@@ -66,6 +66,39 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <script src="/firebase-init.js"></script>
+    
+    <!-- Firebase初期化の監視とタイムアウト処理 -->
+    <script>
+      // Firebaseの初期化が完了したことを確認するためのイベントハンドラー
+      window.addEventListener('firebase-initialized', function() {
+        console.log('Firebase initialization completed, app can now use Firebase services');
+      });
+      
+      // Firebase初期化のタイムアウト処理
+      setTimeout(function() {
+        if (!window._FIREBASE_AUTH) {
+          console.error('Firebase auth initialization timed out. Creating fallback.');
+          // Firebaseが利用可能であれば手動で初期化
+          if (typeof firebase !== 'undefined') {
+            try {
+              window._FIREBASE = firebase;
+              window._FIREBASE_AUTH = firebase.auth();
+              window._FIREBASE_FIRESTORE = firebase.firestore();
+              window._FIREBASE_DATABASE = firebase.database();
+              
+              // 初期化完了イベントを発行
+              const event = new CustomEvent('firebase-initialized');
+              window.dispatchEvent(event);
+              
+              console.log('Firebase services manually initialized as fallback');
+            } catch (error) {
+              console.error('Manual Firebase initialization failed:', error);
+            }
+          }
+        }
+      }, 3000); // 3秒のタイムアウト
+    </script>
+    
     <script type="module" src="/src/main.tsx"></script>
   </head>
   <body>

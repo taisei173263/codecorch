@@ -6,12 +6,12 @@ import TwoFactorAuth from './components/TwoFactorAuth';
 import firebase from 'firebase/app';
 import { 
   auth, 
-  signInWithGithub, 
   signInWithGoogle, 
   loginWithEmail,
   subscribeToAuthChanges,
   handleRedirectResult
 } from './firebase/services';
+import { signInWithGithub as enhancedSignInWithGithub } from './firebase/auth-helpers';
 
 // ダークモードの状態定義
 export interface ThemeContextType {
@@ -159,6 +159,26 @@ function App() {
     setShowTwoFactorSetup(false);
   };
 
+  // GitHub認証ハンドラを修正
+  const handleGithubLogin = async () => {
+    try {
+      // 強化されたGitHub認証関数を使用
+      const result = await enhancedSignInWithGithub();
+      
+      if (result.success && result.user) {
+        console.log('GitHub認証成功 (enhanced):', result.user.uid);
+        
+        // 認証に成功したらダッシュボードに移動
+        setUser(result.user);
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('GitHub認証エラー (enhanced):', error);
+      return { success: false, error };
+    }
+  };
+
   // ローディング中の表示
   if (loading) {
     return (
@@ -218,7 +238,7 @@ function App() {
         />
       ) : (
         <AuthScreen
-          onGithubLogin={signInWithGithub}
+          onGithubLogin={handleGithubLogin}
           onGoogleLogin={signInWithGoogle}
           onEmailLogin={loginWithEmail}
           isDarkMode={isDarkMode}

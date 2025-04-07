@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp, CheckCircle, AlertTriangle, AlertCircle, X } from 'lucide-react';
+import AICodeReview from './AICodeReview';
+import CodeExplainer from './CodeExplainer';
+import { auth } from '../firebase/services';
 
 // 型定義
 interface CodeIssue {
@@ -28,6 +31,7 @@ interface FileAnalysisResult {
     complexity: string;
     bestPractices: string;
   };
+  codeContent?: string;
 }
 
 // サポートされている言語リスト
@@ -45,8 +49,57 @@ const CodeAnalysisView: React.FC<CodeAnalysisViewProps> = ({ analysisResult, fil
     overview: true,
     issues: true,
     metrics: false,
-    explanations: false // スコア説明セクション
+    explanations: false, // スコア説明セクション
+    aiTools: true // AIツールセクション（新規追加）
   });
+  
+  // ユーザーの認証状態を確認
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
+  useEffect(() => {
+    // 認証状態の監視
+    let unsubscribe = () => {};
+    
+    try {
+      if (auth) {
+        unsubscribe = auth.onAuthStateChanged((user: any) => {
+          setIsAuthenticated(!!user);
+          console.log('認証状態が変更されました:', !!user);
+        });
+      } else {
+        console.warn('Auth service is not available');
+        // Authサービスが利用できない場合は未認証として扱う
+        setIsAuthenticated(false);
+      }
+    } catch (error) {
+      console.error('認証状態の監視に失敗しました:', error);
+      setIsAuthenticated(false);
+    }
+    
+    return () => {
+      try {
+        unsubscribe();
+      } catch (error) {
+        console.error('認証監視の解除に失敗しました:', error);
+      }
+    };
+  }, []);
+
+  // 手動で認証状態を確認する関数
+  const checkAuthState = () => {
+    try {
+      const user = auth?.currentUser;
+      setIsAuthenticated(!!user);
+      console.log('手動での認証状態チェック:', !!user);
+    } catch (error) {
+      console.error('認証状態の確認に失敗しました:', error);
+    }
+  };
+
+  // コンポーネント表示時に一度だけ手動で確認
+  useEffect(() => {
+    checkAuthState();
+  }, []);
 
   // セクションの展開/折りたたみを切り替え
   const toggleSection = (section: keyof typeof expandedSections) => {
@@ -322,7 +375,7 @@ const CodeAnalysisView: React.FC<CodeAnalysisViewProps> = ({ analysisResult, fil
       </div>
 
       {/* メトリクスセクション */}
-      <div>
+      <div className="border-b border-gray-200 dark:border-gray-700">
         <button
           className="w-full p-4 flex justify-between items-center bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none transition-colors"
           onClick={() => toggleSection('metrics')}
@@ -391,6 +444,70 @@ const CodeAnalysisView: React.FC<CodeAnalysisViewProps> = ({ analysisResult, fil
           </div>
         )}
       </div>
+
+      {/* AIツールセクション (新規追加) - 認証済みユーザーにのみ表示 */}
+      {isAuthenticated && (
+        <div>
+          <button
+            className="w-full p-4 flex justify-between items-center bg-gray-50 dark:bg-gray-700 hover:bg-gray-100 dark:hover:bg-gray-600 focus:outline-none transition-colors"
+            onClick={() => toggleSection('aiTools')}
+          >
+            <h4 className="font-medium text-gray-900 dark:text-white flex items-center">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-purple-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              AI機能
+            </h4>
+            {expandedSections.aiTools ? (
+              <ChevronUp className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            ) : (
+              <ChevronDown className="h-5 w-5 text-gray-500 dark:text-gray-400" />
+            )}
+          </button>
+
+          {expandedSections.aiTools && (
+            <div className="p-4">
+              <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg mb-4">
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  以下のAI機能を使用して、コードの品質向上や理解を深めることができます。これらの機能はOpenAI GPT-3.5 Turboを使用して提供されています。
+                </p>
+              </div>
+
+              <div className="space-y-6">
+                {/* AIコードレビューコンポーネント */}
+                <AICodeReview 
+                  code={analysisResult.codeContent || ''} 
+                  language={analysisResult.language} 
+                  context={`ファイル名: ${fileName}, 言語: ${analysisResult.language}, 行数: ${analysisResult.lineCount}, 関数数: ${analysisResult.functionCount}`}
+                />
+                
+                {/* コードエクスプレイナーコンポーネント */}
+                <CodeExplainer 
+                  code={analysisResult.codeContent || ''} 
+                  language={analysisResult.language}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* 未認証ユーザー向けのAI機能情報 */}
+      {!isAuthenticated && (
+        <div className="p-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+            <h4 className="font-medium text-blue-800 dark:text-blue-300 flex items-center mb-2">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              AI機能を利用するにはログインが必要です
+            </h4>
+            <p className="text-sm text-blue-700 dark:text-blue-400">
+              GitHubアカウントでログインすると、AIを活用したコードレビューや解説機能を利用できます。
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
