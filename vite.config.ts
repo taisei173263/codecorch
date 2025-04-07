@@ -62,10 +62,9 @@ export default defineConfig({
     alias: [
       { find: 'process', replacement: 'process/browser' },
       { find: 'util', replacement: 'util/' },
-      {
-        find: '#minpath',
-        replacement: 'minpath'
-      }
+      { find: '#minpath', replacement: 'node_modules/vfile/lib/minpath.browser.js' },
+      { find: '#minproc', replacement: 'node_modules/vfile/lib/minproc.browser.js' },
+      { find: '#minurl', replacement: 'node_modules/vfile/lib/minurl.browser.js' }
     ]
   },
   build: {
@@ -93,8 +92,7 @@ export default defineConfig({
         },
         chunkFileNames: 'assets/[name].[hash].js',
         assetFileNames: 'assets/[name].[hash].[ext]'
-      },
-      external: ['#minpath', '#minproc', '#minurl']
+      }
     }
   },
   optimizeDeps: {
