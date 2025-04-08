@@ -66,7 +66,14 @@ const CodeExplainer: React.FC<CodeExplainerProps> = ({ code, language }) => {
         // API利用上限に達した場合
         const usage = await openAIService.getMonthlyUsage();
         setMonthlyUsage(usage);
-        setShowApiKeyModal(true);
+        
+        // 月間利用回数が上限未満の場合はエラーメッセージを表示し、
+        // 上限以上の場合のみAPIキーモーダルを表示する
+        if (usage.current >= usage.limit) {
+          setShowApiKeyModal(true);
+        } else {
+          setError('APIサービスにエラーが発生しました。しばらく待ってから再試行してください。');
+        }
       } else {
         setError(response.error || '不明なエラーが発生しました');
       }

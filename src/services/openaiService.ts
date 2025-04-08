@@ -199,12 +199,13 @@ export class OpenAIService {
     }
 
     // 無料枠の使用回数を確認
-    if (keyStatus.monthlyRequestCount >= MONTHLY_FREE_LIMIT) {
-      return null; // 上限に達した場合、null返却でUIが対応
+    if (keyStatus.monthlyRequestCount < MONTHLY_FREE_LIMIT) {
+      // 上限以下の場合はサーバーキーを返す
+      return SERVER_API_KEY;
     }
 
-    // サーバーキーを使用
-    return SERVER_API_KEY;
+    // 上限を超えた場合はnullを返す
+    return null;
   }
 
   public async getMonthlyUsage(): Promise<{ current: number, limit: number }> {
@@ -268,6 +269,13 @@ export class OpenAIService {
 
       if (!response.ok) {
         const errorData = await response.json();
+        // APIキー関連のエラーをチェック
+        if (errorData.error?.message?.includes('API key provided')) {
+          return {
+            success: false,
+            error: '無効なAPIキーです。別のAPIキーを入力してください。'
+          };
+        }
         return {
           success: false,
           error: errorData.error?.message || '不明なエラーが発生しました'
