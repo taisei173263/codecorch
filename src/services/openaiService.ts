@@ -43,7 +43,7 @@ if (!SERVER_API_KEY) {
 }
 
 export class OpenAIService {
-  private async getUserApiKeyStatus(): Promise<ApiKeyStatus | null> {
+  public async getUserApiKeyStatus(): Promise<ApiKeyStatus | null> {
     // Firebaseが利用可能でない場合のデフォルト状態を返す
     if (!db || !auth) {
       console.warn('Firebase services not available');
@@ -286,10 +286,16 @@ export class OpenAIService {
 
       const data = await response.json();
       
-      // APIリクエストが成功したら必ず使用回数をインクリメント
-      // カスタムキーの場合でも使用回数を記録
-      await this.incrementRequestCount();
-      console.log('OpenAI API使用回数をインクリメントしました');
+      // キー状態を取得
+      const keyStatus = await this.getUserApiKeyStatus();
+      
+      // デフォルトのAPIキーを使用している場合のみカウントを増やす
+      if (!keyStatus?.hasCustomKey || !keyStatus?.customKey) {
+        await this.incrementRequestCount();
+        console.log('OpenAI API使用回数をインクリメントしました（デフォルトキー使用）');
+      } else {
+        console.log('カスタムAPIキーを使用中のため、使用回数はカウントしません');
+      }
 
       return {
         success: true,

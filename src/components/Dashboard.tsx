@@ -3,7 +3,8 @@ import {
   Github, LogOut, Menu, X, Moon, Sun, 
   Code, BarChart3, BookOpen, FileCode, 
   AlertCircle, CheckCircle2, ChevronDown,
-  User as UserIcon, HelpCircle, Folder as FolderIcon
+  User as UserIcon, HelpCircle, Folder as FolderIcon,
+  Key
 } from 'lucide-react';
 import RepositoryList from './RepositoryList';
 import CodeAnalysisView from './CodeAnalysisView';
@@ -15,6 +16,8 @@ import { getUserRepositories, Repository, getRepositoryContents, getFileContent 
 import codeAnalysisService, { RepositoryAnalysisResult, FileAnalysisResult, CodeIssue } from '../services/codeAnalysisService';
 import { generateLearningPath } from '../services/learningPathService';
 import { generateCodeImprovements, prepareImprovementUIData } from '../services/codeImprovementService';
+import { openAIService } from '../services/openaiService';
+import ApiKeyModal from './ApiKeyModal';
 
 // ユーザー型定義
 export interface User {
@@ -61,6 +64,54 @@ export const Dashboard: React.FC<DashboardProps> = ({
   const [loadingFiles, setLoadingFiles] = useState(false);
   const [currentPath, setCurrentPath] = useState<string>('');
   const [codeImprovements, setCodeImprovements] = useState<any[]>([]);
+  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
+  const [monthlyUsage, setMonthlyUsage] = useState<{ current: number; limit: number }>({ current: 0, limit: 50 });
+  const [apiKeyStatus, setApiKeyStatus] = useState<{ hasCustomKey: boolean } | null>(null);
+  const [apiError, setApiError] = useState<string | null>(null);
+
+  // APIキーの状態と使用状況を取得
+  useEffect(() => {
+    const fetchApiStatus = async () => {
+      try {
+        const status = await openAIService.getUserApiKeyStatus();
+        setApiKeyStatus(status);
+        
+        const usage = await openAIService.getMonthlyUsage();
+        setMonthlyUsage(usage);
+      } catch (error) {
+        console.error('API状態の取得に失敗:', error);
+      }
+    };
+    
+    fetchApiStatus();
+  }, []);
+
+  // モーダルを開く
+  const handleOpenApiKeyModal = () => {
+    setApiError(null);
+    setShowApiKeyModal(true);
+  };
+
+  // モーダルを閉じる
+  const handleCloseApiKeyModal = () => {
+    setShowApiKeyModal(false);
+  };
+
+  // APIキー設定成功時の処理
+  const handleApiKeySuccess = async () => {
+    try {
+      // 最新の状態を取得
+      const status = await openAIService.getUserApiKeyStatus();
+      setApiKeyStatus(status);
+      
+      const usage = await openAIService.getMonthlyUsage();
+      setMonthlyUsage(usage);
+      
+      setShowApiKeyModal(false);
+    } catch (error) {
+      console.error('API状態の更新に失敗:', error);
+    }
+  };
 
   // ダークモードの設定
   useEffect(() => {
@@ -237,6 +288,23 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <h1 className="ml-4 text-xl font-bold text-gray-900 dark:text-white">CodeCoach</h1>
           </div>
           <div className="flex items-center space-x-4">
+            {/* APIキー設定ボタン */}
+            <button
+              type="button"
+              className={`flex items-center p-2 rounded-md focus:outline-none ${
+                apiKeyStatus?.hasCustomKey
+                  ? 'text-green-600 dark:text-green-400 hover:text-green-700 dark:hover:text-green-500'
+                  : 'text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400'
+              }`}
+              onClick={handleOpenApiKeyModal}
+              aria-label="APIキー設定"
+            >
+              <Key className="h-5 w-5" />
+              <span className="ml-1 text-xs">
+                {apiKeyStatus?.hasCustomKey ? 'カスタムAPI' : `残り${monthlyUsage.limit - monthlyUsage.current}回`}
+              </span>
+            </button>
+            
             <button
               type="button"
               className="p-2 rounded-md text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 focus:outline-none"
@@ -279,6 +347,12 @@ export const Dashboard: React.FC<DashboardProps> = ({
               </button>
               {showUserMenu && (
                 <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg py-1 z-10">
+                  <button
+                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    onClick={handleOpenApiKeyModal}
+                  >
+                    APIキー設定
+                  </button>
                   <button
                     className="block w-full text-left px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                     onClick={onEnableTwoFactor}
@@ -396,7 +470,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {/* メインコンテンツ */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
-
+        
         <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-100 dark:bg-gray-900 p-4 sm:p-6">
           {activeTab === 'repositories' && (
             <RepositoryList 
@@ -576,6 +650,15 @@ export const Dashboard: React.FC<DashboardProps> = ({
       {showHowToUseGuide && (
         <HowToUseGuide onClose={toggleHowToUseGuide} />
       )}
+
+      {/* APIキー設定モーダル */}
+      <ApiKeyModal
+        isOpen={showApiKeyModal}
+        onClose={handleCloseApiKeyModal}
+        onSuccess={handleApiKeySuccess}
+        monthlyUsage={monthlyUsage}
+        initialError={apiError}
+      />
     </div>
   );
 };
