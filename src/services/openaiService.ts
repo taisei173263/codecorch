@@ -27,6 +27,7 @@ interface ApiResponse {
   success: boolean;
   data?: any;
   error?: string;
+  errorMessage?: string;
 }
 
 const MONTHLY_FREE_LIMIT = 50;
@@ -273,7 +274,8 @@ export class OpenAIService {
         if (errorData.error?.message?.includes('API key provided')) {
           return {
             success: false,
-            error: '無効なAPIキーです。別のAPIキーを入力してください。'
+            error: 'INVALID_API_KEY',
+            errorMessage: '無効なAPIキーです。別のAPIキーを入力してください。'
           };
         }
         return {

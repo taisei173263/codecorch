@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { openAIService } from '../services/openaiService';
 
 interface ApiKeyModalProps {
@@ -9,17 +9,26 @@ interface ApiKeyModalProps {
     current: number;
     limit: number;
   };
+  initialError?: string | null;
 }
 
 const ApiKeyModal: React.FC<ApiKeyModalProps> = ({
   isOpen,
   onClose,
   onSuccess,
-  monthlyUsage
+  monthlyUsage,
+  initialError = null
 }) => {
   const [apiKey, setApiKey] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // エラーが設定されたら表示
+  useEffect(() => {
+    if (initialError) {
+      setError(initialError);
+    }
+  }, [initialError, isOpen]);
 
   if (!isOpen) return null;
 

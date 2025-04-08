@@ -74,6 +74,10 @@ const AICodeReview: React.FC<AICodeReviewProps> = ({ code, language, context }) 
         } else {
           setError('APIサービスにエラーが発生しました。しばらく待ってから再試行してください。');
         }
+      } else if (response.error === 'INVALID_API_KEY') {
+        // 無効なAPIキーの場合、エラーメッセージを表示してAPIキーモーダルを表示
+        setError(response.errorMessage || '無効なAPIキーです。別のAPIキーを入力してください。');
+        setShowApiKeyModal(true);
       } else {
         setError(response.error || '不明なエラーが発生しました');
       }
@@ -148,6 +152,7 @@ const AICodeReview: React.FC<AICodeReviewProps> = ({ code, language, context }) 
         onClose={() => setShowApiKeyModal(false)}
         onSuccess={handleApiKeySuccess}
         monthlyUsage={monthlyUsage}
+        initialError={error}
       />
     </div>
   );
