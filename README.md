@@ -1,6 +1,6 @@
 # CodeCoach: AI搭載コード分析・スキル開発プラットフォーム
 ### YouTube Link:[https://youtu.be/0kUxogSL59U?si=8oQGb7rpcpdCO8dY]
-### URL codecoach2025.netlify.app
+### URL (https://codecoach2025.netlify.app/)
 ## 📋 プロジェクト概要
 
 CodeCoachは、開発者のコード品質向上と技術スキルの成長を加速させるAI搭載Webアプリケーションです。GitHub認証を通じて開発者のリポジトリを分析し、コード品質の評価・改善提案から、パーソナライズされた学習パスの提案まで行います。従来は経験豊富なメンターからしか得られなかったコードレビューと成長アドバイスを、AIの力で誰でも利用できるようにすることを目指しています。
